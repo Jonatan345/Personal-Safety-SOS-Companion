@@ -12,6 +12,17 @@ Students/individuals who frequently travel or walk alone.
 Automatically detects potential incidents (fall/shake) and sends
 location + alert to emergency contact without manual dialing.
 
+## Must-Have Features
+- Real-time accelerometer-based fall/shake detection
+- GPS location capture triggered on incident
+- Countdown screen with cancel option (avoid false alarm)
+- Emergency contact input & validation
+- SMS/notification alert sent automatically to emergency contact
+- Local incident history log (time, location, status)
+- Permission handling (location, sensors, microphone)
+- Loading, empty, and error states on all screens
+- Microphone amplitude threshold as secondary trigger
+  
 ## In Scope
 - Accelerometer-based fall/shake detection
 - GPS location capture on trigger
