@@ -19,6 +19,6 @@ Sensor triggers -> Service detects event -> Save to Hive (local)
                                           -> Sync to Neon (if online)
 
 ## Key Decisions
-- Hive dipilih karena data simpel (tidak perlu relasi tabel)
-- Local-first: Hive selalu jalan meski offline
-- Neon dipakai sebagai backup/API layer opsional
+- Hive is chosen because the data is simple (no table relation needed)
+- Local-first: Hive always work even offline
+- Neon used for backup/optional API layer 
