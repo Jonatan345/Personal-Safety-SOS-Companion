@@ -36,3 +36,21 @@ location + alert to emergency contact without manual dialing.
 - Cloud backend / multi-user accounts
 - Real speech recognition (only amplitude threshold)
 - Wearable device integration
+
+## Success Criteria
+- Aplikasi berhasil mendeteksi shake/fall pattern via accelerometer
+- GPS location berhasil diambil otomatis saat incident terdeteksi
+- Countdown + cancel berfungsi (tidak trigger alert jika dibatalkan)
+- Alert/notifikasi berhasil terkirim ke emergency contact
+- Data incident tersimpan secara lokal (offline-first) via Hive
+- Semua permission (lokasi, sensor, mic) ditangani dengan benar
+- APK dapat diinstal dan didemokan end-to-end tanpa crash
+
+## User Flow
+1. Home Screen → user set emergency contact (first time only)
+2. User tap "Start Monitoring" → Monitoring Screen aktif (accelerometer + mic jalan)
+3. Sensor deteksi shake/fall → auto-navigate ke Incident Detected Screen
+4. Countdown 10 detik muncul:
+   - Jika dibatalkan → kembali ke Monitoring Screen
+   - Jika tidak dibatalkan → GPS diambil → Alert terkirim ke emergency contact
+5. Incident tersimpan ke History Screen (waktu, lokasi, status)
