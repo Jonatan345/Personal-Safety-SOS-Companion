@@ -3,11 +3,16 @@ sos_companion/
 ├── ios/
 ├── lib/
 │   ├── main.dart
+│   ├── theme/                          
+│   │   └── app_theme.dart
+│   ├── routes/                         
+│   │   └── app_routes.dart
 │   ├── screens/
 │   │   ├── home_screen.dart
 │   │   ├── monitoring_screen.dart
 │   │   ├── incident_screen.dart
-│   │   └── history_screen.dart
+│   │   ├── history_screen.dart
+│   │   └── contact_setup_screen.dart   
 │   ├── services/
 │   │   ├── accelerometer_service.dart
 │   │   ├── location_service.dart
@@ -15,6 +20,10 @@ sos_companion/
 │   ├── models/
 │   │   └── incident.dart
 │   ├── widgets/
+│   │   ├── primary_button.dart         
+│   │   ├── app_card.dart               
+│   │   ├── app_input_field.dart        
+│   │   └── status_badge.dart           
 │   └── utils/
 ├── assets/
 ├── docs/
