@@ -46,7 +46,7 @@ class HistoryScreen extends StatelessWidget {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: (sent ? AppColors.danger : AppColors.textSecondary).withOpacity(0.1),
+                            color: (sent ? AppColors.danger : AppColors.textSecondary).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -95,7 +95,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.inbox_outlined, size: 56, color: AppColors.textSecondary.withOpacity(0.5)),
+          Icon(Icons.inbox_outlined, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.5)),
           const SizedBox(height: 12),
           const Text('Belum ada riwayat insiden', style: TextStyle(color: AppColors.textSecondary)),
         ],
