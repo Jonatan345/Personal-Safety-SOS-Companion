@@ -29,7 +29,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                       width: 90,
                       height: 90,
                       decoration: BoxDecoration(
-                        color: isActive ? AppColors.success.withOpacity(0.12) : AppColors.border,
+                        color: isActive ? AppColors.success.withValues(alpha: 0.12) : AppColors.border,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
