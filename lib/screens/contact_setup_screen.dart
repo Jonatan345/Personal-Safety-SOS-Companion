@@ -23,7 +23,7 @@ class _ContactSetupScreenState extends State<ContactSetupScreen> {
     if (!mounted) return;
     setState(() => loading = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Kontak darurat berhasil disimpan')),
+      const SnackBar(content: Text('Simulasi: kontak darurat berhasil disimpan')),
     );
     Navigator.pop(context);
   }
@@ -53,12 +53,24 @@ class _ContactSetupScreenState extends State<ContactSetupScreen> {
                       const SizedBox(height: 16),
                       AppInputField(
                         label: 'Nomor Telepon',
-                        hint: '08xxxxxxxxxx',
+                        hint: 'Contoh: 911, 112, atau +1 555 123 4567',
                         controller: phoneController,
                         keyboardType: TextInputType.phone,
                         prefixIcon: Icons.phone_outlined,
-                        validator: (v) =>
-                            (v == null || v.length < 8) ? 'Nomor telepon tidak valid' : null,
+                        validator: (v) {
+                          final phoneNumber = v?.trim() ?? '';
+                          final digitCount = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '').length;
+
+                          if (digitCount < 3) {
+                            return 'Masukkan minimal 3 digit';
+                          }
+
+                          if (!RegExp(r'^[0-9+()\-\s.]+$').hasMatch(phoneNumber)) {
+                            return 'Gunakan angka dan simbol nomor telepon yang valid';
+                          }
+
+                          return null;
+                        },
                       ),
                     ],
                   ),
