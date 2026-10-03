@@ -1,11 +1,23 @@
-enum IncidentStatus { sent, cancelled, pending }
+import 'package:hive/hive.dart';
 
-class Incident {
-  final String id;
-  final DateTime timestamp;
-  final double latitude;
-  final double longitude;
-  final IncidentStatus status;
+part 'incident.g.dart';
+
+@HiveType(typeId: 0)
+class Incident extends HiveObject {
+  @HiveField(0)
+  String id;
+
+  @HiveField(1)
+  DateTime timestamp;
+
+  @HiveField(2)
+  double latitude;
+
+  @HiveField(3)
+  double longitude;
+
+  @HiveField(4)
+  String status; // 'sent' | 'cancelled' | 'pending'
 
   Incident({
     required this.id,
