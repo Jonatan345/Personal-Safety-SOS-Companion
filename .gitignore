@@ -6,7 +6,7 @@ build/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-
+.github-p4-publish/
 
 # Android
 android/.gradle
