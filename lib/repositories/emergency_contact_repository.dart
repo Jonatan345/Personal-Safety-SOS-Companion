@@ -1,38 +1,41 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:io';
 
-import '../models/emergency_contact.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
+import 'package:sos_companion/models/emergency_contact.dart';
+import 'package:sos_companion/repositories/emergency_contact_repository.dart';
 
-abstract class EmergencyContactRepository {
-  Future<EmergencyContact?> fetchContact();
-  Future<EmergencyContact> saveContact(EmergencyContactDraft draft);
-}
+void main() {
+  late Directory testDirectory;
 
-/// Temporary P4 repository. Replace this with a Hive-backed implementation in P5.
-class InMemoryEmergencyContactRepository implements EmergencyContactRepository {
-  InMemoryEmergencyContactRepository(
-      {this.latency = const Duration(milliseconds: 500)});
+  setUp(() async {
+    testDirectory =
+        await Directory.systemTemp.createTemp('sos_contact_repository_test_');
+    Hive.init(testDirectory.path);
+    await Hive.openBox<String>(HiveEmergencyContactRepository.boxName);
+  });
 
-  final Duration latency;
-  EmergencyContact? _contact;
+  tearDown(() async {
+    await Hive.close();
+    await testDirectory.delete(recursive: true);
+  });
 
-  @override
-  Future<EmergencyContact?> fetchContact() async {
-    await Future<void>.delayed(latency);
-    return _contact;
-  }
-
-  @override
-  Future<EmergencyContact> saveContact(EmergencyContactDraft draft) async {
-    await Future<void>.delayed(latency);
-    _contact = EmergencyContact(
-      id: 'primary-contact',
-      name: draft.name,
-      phoneNumber: draft.phoneNumber,
+  test('saved emergency contact remains available after reopening the box',
+      () async {
+    final repository = HiveEmergencyContactRepository();
+    const draft = EmergencyContactDraft(
+      name: 'Ibu Sari',
+      phoneNumber: '08123456789',
     );
-    return _contact!;
-  }
-}
 
-final emergencyContactRepositoryProvider = Provider<EmergencyContactRepository>(
-  (ref) => InMemoryEmergencyContactRepository(),
-);
+    await repository.saveContact(draft);
+    await Hive.box<String>(HiveEmergencyContactRepository.boxName).close();
+    await Hive.openBox<String>(HiveEmergencyContactRepository.boxName);
+
+    final contact = await repository.fetchContact();
+
+    expect(contact?.id, HiveEmergencyContactRepository.contactKey);
+    expect(contact?.name, 'Ibu Sari');
+    expect(contact?.phoneNumber, '08123456789');
+  });
+}
