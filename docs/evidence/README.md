@@ -8,3 +8,6 @@ Add one of the following before submitting P4:
 
 The automated proof is available in `../p4-state-management.md` and
 `test/contact_setup_screen_test.dart`.
+
+## P5 Demo Evidence
+Video CRUD dan persistence: <https://youtu.be/JmwPUNWhOu0>
