@@ -2,10 +2,10 @@
 
 ## Current Stage
 
-This repository is a Flutter project created with `flutter create .`. It is
-currently at P4. Emergency Contact uses Riverpod with an in-memory repository;
-monitoring, sensors, location, permanent storage, and SMS integrations have
-not been implemented yet.
+This repository is a Flutter project created with `flutter create .`. It has
+local Hive persistence for emergency contacts and incident history, with
+Riverpod exposing application state. Real sensor detection, GPS capture, and
+SMS integrations have not been implemented yet.
 
 ## Current Stack
 
@@ -98,7 +98,7 @@ Accelerometer / microphone event
   → incident-detection service
   → location service
   → countdown and user cancellation option
-  → local incident storage
+  → local incident history (sent or cancelled)
   → emergency alert
 
 
