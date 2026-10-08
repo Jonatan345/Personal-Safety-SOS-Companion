@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'theme/app_theme.dart';
-import 'routes/app_routes.dart';
+
 import 'models/incident.dart';
+import 'repositories/emergency_contact_repository.dart';
 import 'repositories/incident_repository.dart';
+import 'routes/app_routes.dart';
+import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +15,7 @@ Future<void> main() async {
 
   Hive.registerAdapter(IncidentAdapter());
   await Hive.openBox<Incident>(IncidentRepository.boxName);
+  await Hive.openBox<String>(HiveEmergencyContactRepository.boxName);
   runApp(const ProviderScope(child: SosCompanionApp()));
 }
 
