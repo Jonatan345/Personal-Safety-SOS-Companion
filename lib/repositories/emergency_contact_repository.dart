@@ -1,41 +1,60 @@
-import 'dart:io';
+import 'dart:convert';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
-import 'package:sos_companion/models/emergency_contact.dart';
-import 'package:sos_companion/repositories/emergency_contact_repository.dart';
 
-void main() {
-  late Directory testDirectory;
+import '../models/emergency_contact.dart';
 
-  setUp(() async {
-    testDirectory =
-        await Directory.systemTemp.createTemp('sos_contact_repository_test_');
-    Hive.init(testDirectory.path);
-    await Hive.openBox<String>(HiveEmergencyContactRepository.boxName);
-  });
-
-  tearDown(() async {
-    await Hive.close();
-    await testDirectory.delete(recursive: true);
-  });
-
-  test('saved emergency contact remains available after reopening the box',
-      () async {
-    final repository = HiveEmergencyContactRepository();
-    const draft = EmergencyContactDraft(
-      name: 'Ibu Sari',
-      phoneNumber: '08123456789',
-    );
-
-    await repository.saveContact(draft);
-    await Hive.box<String>(HiveEmergencyContactRepository.boxName).close();
-    await Hive.openBox<String>(HiveEmergencyContactRepository.boxName);
-
-    final contact = await repository.fetchContact();
-
-    expect(contact?.id, HiveEmergencyContactRepository.contactKey);
-    expect(contact?.name, 'Ibu Sari');
-    expect(contact?.phoneNumber, '08123456789');
-  });
+abstract class EmergencyContactRepository {
+  Future<EmergencyContact?> fetchContact();
+  Future<EmergencyContact> saveContact(EmergencyContactDraft draft);
 }
+
+class HiveEmergencyContactRepository implements EmergencyContactRepository {
+  static const String boxName = 'emergency_contacts';
+  static const String contactKey = 'primary-contact';
+
+  Box<String> get _box => Hive.box<String>(boxName);
+
+  @override
+  Future<EmergencyContact?> fetchContact() async {
+    final serializedContact = _box.get(contactKey);
+    if (serializedContact == null) return null;
+
+    final decoded = jsonDecode(serializedContact);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Stored emergency contact is invalid.');
+    }
+
+    final id = decoded['id'];
+    final name = decoded['name'];
+    final phoneNumber = decoded['phoneNumber'];
+    if (id is! String || name is! String || phoneNumber is! String) {
+      throw const FormatException('Stored emergency contact is incomplete.');
+    }
+
+    return EmergencyContact(id: id, name: name, phoneNumber: phoneNumber);
+  }
+
+  @override
+  Future<EmergencyContact> saveContact(EmergencyContactDraft draft) async {
+    final contact = EmergencyContact(
+      id: contactKey,
+      name: draft.name,
+      phoneNumber: draft.phoneNumber,
+    );
+    await _box.put(
+      contactKey,
+      jsonEncode({
+        'id': contact.id,
+        'name': contact.name,
+        'phoneNumber': contact.phoneNumber,
+      }),
+    );
+    return contact;
+  }
+}
+
+final emergencyContactRepositoryProvider = Provider<EmergencyContactRepository>(
+  (ref) => HiveEmergencyContactRepository(),
+);
