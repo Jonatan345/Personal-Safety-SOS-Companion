@@ -2,10 +2,10 @@
 
 ## Tujuan Feature
 
-Feature **Kontak Darurat** menerapkan form dan state management nyata dengan
-Riverpod. Pada P4, repository masih in-memory agar fokus tugas berada pada
-state UI, validasi, dan pemisahan tanggung jawab. Penyimpanan permanen dengan
-Hive dijadwalkan untuk P5.
+Feature **Kontak Darurat** menerapkan form dan state management dengan
+Riverpod. Implementasi awal P4 menggunakan repository in-memory; repository
+saat ini memakai Hive agar kontak tetap tersedia setelah aplikasi dibuka
+kembali.
 
 ## Arsitektur
 
@@ -14,7 +14,7 @@ ContactSetupScreen (widget/UI)
   → EmergencyContactNotifier (Riverpod state controller)
   → Load/SaveEmergencyContactUseCase (business action)
   → EmergencyContactRepository (data abstraction)
-  → InMemoryEmergencyContactRepository (temporary P4 implementation)
+  → HiveEmergencyContactRepository (local persistent storage)
 ```
 
 Lokasi kode:
@@ -24,7 +24,7 @@ Lokasi kode:
   empty, error, retry, dan submit.
 - `lib/use_cases/emergency_contact_use_cases.dart` — use case load/save.
 - `lib/repositories/emergency_contact_repository.dart` — kontrak repository
-  dan implementasi in-memory.
+  dan implementasi Hive.
 - `lib/models/emergency_contact.dart` — entity dan data input.
 
 ## Enam Kondisi UI Wajib
