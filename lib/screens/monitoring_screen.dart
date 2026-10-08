@@ -29,19 +29,24 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                       width: 90,
                       height: 90,
                       decoration: BoxDecoration(
-                        color: isActive ? AppColors.success.withValues(alpha: 0.12) : AppColors.border,
+                        color: isActive
+                            ? AppColors.success.withValues(alpha: 0.12)
+                            : AppColors.border,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.sensors,
                         size: 40,
-                        color: isActive ? AppColors.success : AppColors.textSecondary,
+                        color: isActive
+                            ? AppColors.success
+                            : AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 14),
                     Text(
                       isActive ? 'Sensor Aktif' : 'Sensor Nonaktif',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 16),
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -53,11 +58,20 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const _SensorRow(label: 'Accelerometer', value: 'Normal', icon: Icons.vibration),
+              const _SensorRow(
+                  label: 'Accelerometer',
+                  value: 'Normal',
+                  icon: Icons.vibration),
               const SizedBox(height: 10),
-              const _SensorRow(label: 'GPS', value: 'Siap', icon: Icons.location_on_outlined),
+              const _SensorRow(
+                  label: 'GPS',
+                  value: 'Siap',
+                  icon: Icons.location_on_outlined),
               const SizedBox(height: 10),
-              const _SensorRow(label: 'Mikrofon', value: 'Mendengarkan', icon: Icons.mic_none),
+              const _SensorRow(
+                  label: 'Mikrofon',
+                  value: 'Mendengarkan',
+                  icon: Icons.mic_none),
               const Spacer(),
               PrimaryButton(
                 label: 'Simulasikan Insiden',
@@ -84,7 +98,8 @@ class _SensorRow extends StatelessWidget {
   final String value;
   final IconData icon;
 
-  const _SensorRow({required this.label, required this.value, required this.icon});
+  const _SensorRow(
+      {required this.label, required this.value, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -94,8 +109,12 @@ class _SensorRow extends StatelessWidget {
         children: [
           Icon(icon, color: AppColors.primary, size: 20),
           const SizedBox(width: 12),
-          Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
-          Text(value, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          Expanded(
+              child: Text(label,
+                  style: const TextStyle(fontWeight: FontWeight.w600))),
+          Text(value,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 13)),
         ],
       ),
     );

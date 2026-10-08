@@ -36,14 +36,17 @@ class AppTheme {
         ),
       ),
       textTheme: const TextTheme(
-        headlineMedium: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-        titleMedium: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+        headlineMedium: TextStyle(
+            fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+        titleMedium: TextStyle(
+            fontWeight: FontWeight.w600, color: AppColors.textPrimary),
         bodyMedium: TextStyle(color: AppColors.textSecondary, height: 1.4),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.border),
