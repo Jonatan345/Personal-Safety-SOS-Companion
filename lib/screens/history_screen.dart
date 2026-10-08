@@ -11,17 +11,6 @@ import '../notifiers/incident_notifier.dart';
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
 
-  Future<void> _addDummyIncident(WidgetRef ref) async {
-    final incident = Incident(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      timestamp: DateTime.now(),
-      latitude: -6.2088,
-      longitude: 106.8456,
-      status: 'sent',
-    );
-    await ref.read(incidentNotifierProvider.notifier).addIncident(incident);
-  }
-
   Future<void> _toggleStatus(WidgetRef ref, Incident item) async {
     final newStatus = item.status == 'sent' ? 'cancelled' : 'sent';
     await ref.read(incidentNotifierProvider.notifier).updateStatus(item.id, newStatus);
@@ -36,15 +25,7 @@ class HistoryScreen extends ConsumerWidget {
     final data = ref.watch(incidentNotifierProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Riwayat Insiden'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline),
-            onPressed: () => _addDummyIncident(ref),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Riwayat Insiden')),
       body: SafeArea(
         child: data.isEmpty
             ? const _EmptyState()
@@ -133,7 +114,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 12),
           const Text('Belum ada riwayat insiden', style: TextStyle(color: AppColors.textSecondary)),
           const SizedBox(height: 4),
-          const Text('Tap + di atas untuk tambah data uji',
+          const Text('Insiden yang tercatat akan muncul di sini',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
         ],
       ),
