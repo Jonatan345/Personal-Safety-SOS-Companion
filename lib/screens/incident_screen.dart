@@ -1,18 +1,24 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/incident.dart';
+import '../notifiers/incident_notifier.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 
-class IncidentScreen extends StatefulWidget {
+class IncidentScreen extends ConsumerStatefulWidget {
   const IncidentScreen({super.key});
 
   @override
-  State<IncidentScreen> createState() => _IncidentScreenState();
+  ConsumerState<IncidentScreen> createState() => _IncidentScreenState();
 }
 
-class _IncidentScreenState extends State<IncidentScreen> {
+class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   int secondsLeft = 10;
   Timer? timer;
+  bool _isCompleting = false;
 
   @override
   void initState() {
@@ -20,21 +26,48 @@ class _IncidentScreenState extends State<IncidentScreen> {
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (secondsLeft <= 1) {
         t.cancel();
-        _sendAlert();
+        _finishIncident('sent');
       } else {
         setState(() => secondsLeft--);
       }
     });
   }
 
-  void _sendAlert() {
+  Future<void> _finishIncident(String status) async {
+    if (!mounted || _isCompleting) return;
+    setState(() => _isCompleting = true);
+    timer?.cancel();
+
+    final incident = Incident(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      timestamp: DateTime.now(),
+      latitude: -6.2088,
+      longitude: 106.8456,
+      status: status,
+    );
+
+    try {
+      await ref.read(incidentNotifierProvider.notifier).addIncident(incident);
+    } catch (error) {
+      debugPrint('Failed to save incident history: $error');
+      if (!mounted) return;
+      setState(() => _isCompleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Riwayat insiden gagal disimpan.')),
+      );
+      return;
+    }
+
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/history');
+    if (status == 'sent') {
+      Navigator.pushReplacementNamed(context, '/history');
+    } else {
+      Navigator.pop(context);
+    }
   }
 
   void _cancel() {
-    timer?.cancel();
-    Navigator.pop(context);
+    _finishIncident('cancelled');
   }
 
   @override
@@ -57,7 +90,10 @@ class _IncidentScreenState extends State<IncidentScreen> {
               const SizedBox(height: 16),
               const Text(
                 'Insiden Terdeteksi',
-                style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
               const Text(
@@ -69,18 +105,25 @@ class _IncidentScreenState extends State<IncidentScreen> {
               Container(
                 width: 120,
                 height: 120,
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                    color: Colors.white, shape: BoxShape.circle),
                 alignment: Alignment.center,
                 child: Text(
                   '$secondsLeft',
-                  style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w800, color: AppColors.danger),
+                  style: const TextStyle(
+                      fontSize: 44,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.danger),
                 ),
               ),
               const SizedBox(height: 40),
               PrimaryButton(
-                label: 'Batalkan (Ini Bukan Darurat)',
+                label: _isCompleting
+                    ? 'Menyimpan Riwayat...'
+                    : 'Batalkan (Ini Bukan Darurat)',
                 color: Colors.white,
-                onPressed: _cancel,
+                onPressed: _isCompleting ? null : _cancel,
+                loading: _isCompleting,
               ),
             ],
           ),
