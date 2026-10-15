@@ -70,7 +70,8 @@ class IncidentNotifier extends StateNotifier<AsyncValue<List<Incident>>> {
     if (incidents == null) return;
     try {
       await _repository.deleteIncident(id);
-      state = AsyncData(incidents.where((incident) => incident.id != id).toList());
+      state =
+          AsyncData(incidents.where((incident) => incident.id != id).toList());
     } catch (_) {
       state = AsyncData(List<Incident>.of(incidents));
       rethrow;
@@ -85,8 +86,11 @@ class IncidentNotifier extends StateNotifier<AsyncValue<List<Incident>>> {
 final incidentApiProvider = Provider<IncidentApi>((ref) {
   final client = http.Client();
   ref.onDispose(client.close);
+  const configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
   return IncidentApi(
-    baseUrl: const String.fromEnvironment('API_BASE_URL'),
+    baseUrl: configuredBaseUrl.isNotEmpty
+        ? configuredBaseUrl
+        : 'http://10.0.2.2:8080/api',
     client: client,
   );
 });
@@ -95,8 +99,8 @@ final incidentRepositoryProvider = Provider<IncidentRepository>((ref) {
   return IncidentRepository(ref.watch(incidentApiProvider));
 });
 
-final incidentNotifierProvider = StateNotifierProvider<IncidentNotifier,
-    AsyncValue<List<Incident>>>((ref) {
+final incidentNotifierProvider =
+    StateNotifierProvider<IncidentNotifier, AsyncValue<List<Incident>>>((ref) {
   final repository = ref.watch(incidentRepositoryProvider);
   return IncidentNotifier(repository);
 });

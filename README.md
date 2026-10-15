@@ -57,11 +57,26 @@ location + alert to emergency contact without manual dialing.
 
 ## Incident API (P6)
 
-Configure the backend base URL at launch; the app appends `/incidents`:
+The repository includes a small REST backend for local end-to-end demos. Start
+it with Node.js 20 or newer:
 
 ```sh
-flutter run --dart-define=API_BASE_URL=https://your-api.example.com/api
+node backend/server.mjs
 ```
+
+The backend listens on `http://0.0.0.0:8080`; incident data is stored in the
+ignored file `backend/data/incidents.json`. The Android emulator can reach the
+host machine at `http://10.0.2.2:8080/api`, which is the app's default API URL.
+For Flutter web or desktop, configure `http://localhost:8080/api`. For a
+physical device, use the computer's LAN IP. For a deployed HTTPS backend,
+configure the base URL at launch. In each case the app appends `/incidents`:
+
+```sh
+flutter run --dart-define=API_BASE_URL=https://your-deployed-api.example/api
+```
+
+This backend is intended for local demos and testing only. It has no
+authentication and is not a publicly deployed service.
 
 The API contract used by the app is:
 
@@ -78,4 +93,10 @@ Run the focused API/model unit tests with:
 
 ```sh
 flutter test test/incident_api_test.dart
+```
+
+Run the backend tests with:
+
+```sh
+node --test backend/server.test.mjs
 ```
