@@ -18,7 +18,7 @@ location + alert to emergency contact without manual dialing.
 - Countdown screen with cancel option (avoid false alarm)
 - Emergency contact input & validation
 - SMS/notification alert sent automatically to emergency contact
-- Local incident history log (time, location, status)
+- Incident history stored and loaded through the REST backend (time, location, status)
 - Permission handling (location, sensors, microphone)
 - Loading, empty, and error states on all screens
 - Microphone amplitude threshold as secondary trigger
@@ -33,7 +33,7 @@ location + alert to emergency contact without manual dialing.
 
 ## Out of Scope
 - Multiple emergency contacts
-- Cloud backend / multi-user accounts
+- Multi-user accounts
 - Real speech recognition (only amplitude threshold)
 - Wearable device integration
 
@@ -42,7 +42,7 @@ location + alert to emergency contact without manual dialing.
 - GPS location berhasil diambil otomatis saat incident terdeteksi
 - Countdown + cancel berfungsi (tidak trigger alert jika dibatalkan)
 - Alert/notifikasi berhasil terkirim ke emergency contact
-- Data incident tersimpan secara lokal (offline-first) via Hive
+- Riwayat insiden tersimpan dan dimuat melalui API backend
 - Semua permission (lokasi, sensor, mic) ditangani dengan benar
 - APK dapat diinstal dan didemokan end-to-end tanpa crash
 
@@ -54,3 +54,28 @@ location + alert to emergency contact without manual dialing.
    - Jika dibatalkan → kembali ke Monitoring Screen
    - Jika tidak dibatalkan → GPS diambil → Alert terkirim ke emergency contact
 5. Incident tersimpan ke History Screen (waktu, lokasi, status)
+
+## Incident API (P6)
+
+Configure the backend base URL at launch; the app appends `/incidents`:
+
+```sh
+flutter run --dart-define=API_BASE_URL=https://your-api.example.com/api
+```
+
+The API contract used by the app is:
+
+- `GET /incidents` returns a JSON array of incidents (an empty array means no history).
+- `POST /incidents` accepts and returns one incident as a JSON object.
+- `PATCH /incidents/{id}` accepts an updated incident object.
+- `DELETE /incidents/{id}` removes the incident.
+
+Incident objects use `id`, `timestamp` (ISO 8601), `latitude`, `longitude`, and
+`status` (`sent`, `cancelled`, or `pending`). History displays loading, empty,
+error, and success states, and allows retrying a failed load.
+
+Run the focused API/model unit tests with:
+
+```sh
+flutter test test/incident_api_test.dart
+```

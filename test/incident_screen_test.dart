@@ -1,21 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:sos_companion/models/incident.dart';
 import 'package:sos_companion/notifiers/incident_notifier.dart';
 import 'package:sos_companion/repositories/incident_repository.dart';
+import 'package:sos_companion/services/incident_api.dart';
 import 'package:sos_companion/screens/history_screen.dart';
 import 'package:sos_companion/screens/incident_screen.dart';
 
 class FakeIncidentRepository extends IncidentRepository {
+  FakeIncidentRepository()
+      : super(
+          IncidentApi(
+            baseUrl: 'https://api.example.test',
+            client: MockClient((_) async => http.Response('[]', 200)),
+          ),
+        );
+
   final List<Incident> incidents = [];
 
   @override
-  List<Incident> getAllIncidents() => List<Incident>.of(incidents);
+  Future<List<Incident>> getAllIncidents() async =>
+      List<Incident>.of(incidents);
 
   @override
-  Future<void> addIncident(Incident incident) async {
+  Future<Incident> addIncident(Incident incident) async {
     incidents.add(incident);
+    return incident;
+  }
+
+  @override
+  Future<void> updateIncident(Incident incident) async {}
+
+  @override
+  Future<void> deleteIncident(String id) async {
+    incidents.removeWhere((incident) => incident.id == id);
   }
 }
 
