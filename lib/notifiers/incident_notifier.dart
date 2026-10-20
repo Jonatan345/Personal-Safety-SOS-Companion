@@ -9,26 +9,32 @@ import '../services/incident_api.dart';
 
 class IncidentNotifier extends StateNotifier<AsyncValue<List<Incident>>> {
   final IncidentRepository _repository;
+  int _operation = 0;
 
   IncidentNotifier(this._repository) : super(const AsyncLoading()) {
     unawaited(refresh());
   }
 
   Future<void> refresh() async {
+    final operation = ++_operation;
     state = const AsyncLoading();
     try {
-      state = AsyncData(await _repository.getAllIncidents());
+      final incidents = await _repository.getAllIncidents();
+      if (operation == _operation) state = AsyncData(incidents);
     } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
+      if (operation == _operation) state = AsyncError(error, stackTrace);
     }
   }
 
   Future<void> addIncident(Incident incident) async {
+    final operation = ++_operation;
     final previous = state;
     try {
       final created = await _repository.addIncident(incident);
       final incidents = previous.asData?.value ?? const <Incident>[];
-      state = AsyncData(_sorted([created, ...incidents]));
+      if (operation == _operation) {
+        state = AsyncData(_sorted([created, ...incidents]));
+      }
     } catch (error, stackTrace) {
       final incidents = previous.asData?.value;
       state = incidents == null
@@ -39,6 +45,7 @@ class IncidentNotifier extends StateNotifier<AsyncValue<List<Incident>>> {
   }
 
   Future<void> updateStatus(String id, String status) async {
+    final operation = ++_operation;
     final previous = state;
     final incidents = previous.asData?.value;
     if (incidents == null) return;
@@ -57,7 +64,7 @@ class IncidentNotifier extends StateNotifier<AsyncValue<List<Incident>>> {
     try {
       final incident = updated.firstWhere((item) => item.id == id);
       await _repository.updateIncident(incident);
-      state = AsyncData(updated);
+      if (operation == _operation) state = AsyncData(updated);
     } catch (_) {
       state = AsyncData(List<Incident>.of(incidents));
       rethrow;
@@ -65,13 +72,15 @@ class IncidentNotifier extends StateNotifier<AsyncValue<List<Incident>>> {
   }
 
   Future<void> deleteIncident(String id) async {
+    final operation = ++_operation;
     final previous = state;
     final incidents = previous.asData?.value;
     if (incidents == null) return;
     try {
       await _repository.deleteIncident(id);
-      state =
-          AsyncData(incidents.where((incident) => incident.id != id).toList());
+      if (operation == _operation) {
+        state = AsyncData(incidents.where((incident) => incident.id != id).toList());
+      }
     } catch (_) {
       state = AsyncData(List<Incident>.of(incidents));
       rethrow;

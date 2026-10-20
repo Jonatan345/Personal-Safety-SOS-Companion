@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 
 import '../models/emergency_contact.dart';
+import '../services/local_storage_service.dart';
 
 abstract class EmergencyContactRepository {
   Future<EmergencyContact?> fetchContact();
@@ -11,13 +12,15 @@ abstract class EmergencyContactRepository {
 }
 
 class HiveEmergencyContactRepository implements EmergencyContactRepository {
-  static const String boxName = 'emergency_contacts';
+  // Versioned namespace avoids reading incompatible Hive data from older demos.
+  static const String boxName = 'emergency_contacts_v2';
   static const String contactKey = 'primary-contact';
 
   Box<String> get _box => Hive.box<String>(boxName);
 
   @override
   Future<EmergencyContact?> fetchContact() async {
+    await LocalStorageService.ensureReady();
     final serializedContact = _box.get(contactKey);
     if (serializedContact == null) return null;
 
@@ -38,6 +41,7 @@ class HiveEmergencyContactRepository implements EmergencyContactRepository {
 
   @override
   Future<EmergencyContact> saveContact(EmergencyContactDraft draft) async {
+    await LocalStorageService.ensureReady();
     final contact = EmergencyContact(
       id: contactKey,
       name: draft.name,
