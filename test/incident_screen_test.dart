@@ -44,7 +44,9 @@ Widget createSubject(FakeIncidentRepository repository) {
   return ProviderScope(
     overrides: [incidentRepositoryProvider.overrideWithValue(repository)],
     child: MaterialApp(
-      home: const IncidentScreen(),
+      home: IncidentScreen(
+        locationProvider: () async => throw StateError('GPS unavailable in widget test'),
+      ),
       routes: {'/history': (_) => const HistoryScreen()},
     ),
   );

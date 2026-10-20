@@ -12,13 +12,26 @@ Students/individuals who frequently travel or walk alone.
 Automatically detects potential incidents (fall/shake) and sends
 location + alert to emergency contact without manual dialing.
 
+## MVP P7: fitur yang dapat didemokan
+- **Sensor**: accelerometer memicu alarm ketika percepatan melewati ambang shake/fall; mikrofon membaca amplitudo lingkungan dan memicu alarm pada 85 dB.
+- **Lokasi**: setelah countdown habis, aplikasi mengambil GPS berakurasi tinggi dan menyimpan koordinat pada riwayat lokal Hive.
+- **Notifikasi dan SMS**: notifikasi perangkat mengonfirmasi alert. Bila kontak tersedia, aplikasi membuka SMS composer perangkat dengan tautan Google Maps agar pengguna tetap memberi persetujuan akhir sebelum SMS dikirim.
+- **Izin dan state**: izin lokasi, mikrofon, dan notifikasi diminta sebelum monitoring dimulai; penolakan menampilkan pesan serta tombol coba lagi. Loading, empty, error, retry, dan pembatalan countdown juga tersedia.
+
+### Demo vertical slice
+1. Tambahkan satu kontak darurat dari **Kontak Darurat**.
+2. Ketuk **Mulai Monitoring** dan izinkan lokasi, mikrofon, serta notifikasi.
+3. Goyangkan perangkat kuat-kuat atau ketuk **Simulasikan Shake/Fall**.
+4. Biarkan countdown sepuluh detik selesai: GPS diambil, insiden tersimpan di Hive, notifikasi muncul, lalu SMS composer terbuka dengan lokasi.
+5. Periksa **Riwayat**. Gunakan tombol pembatalan sebelum countdown habis untuk mencatat insiden sebagai dibatalkan tanpa mengambil lokasi atau membuka SMS.
+
 ## Must-Have Features
 - Real-time accelerometer-based fall/shake detection
 - GPS location capture triggered on incident
 - Countdown screen with cancel option (avoid false alarm)
 - Emergency contact input & validation
 - SMS/notification alert sent automatically to emergency contact
-- Incident history stored and loaded through the REST backend (time, location, status)
+- Incident history stored locally in Hive (time, location, status); REST sync is optional for the older P6 demo backend
 - Permission handling (location, sensors, microphone)
 - Loading, empty, and error states on all screens
 - Microphone amplitude threshold as secondary trigger
@@ -42,7 +55,7 @@ location + alert to emergency contact without manual dialing.
 - GPS location berhasil diambil otomatis saat incident terdeteksi
 - Countdown + cancel berfungsi (tidak trigger alert jika dibatalkan)
 - Alert/notifikasi berhasil terkirim ke emergency contact
-- Riwayat insiden tersimpan dan dimuat melalui API backend
+- Riwayat insiden tersimpan dan dimuat secara lokal, termasuk saat backend tidak aktif
 - Semua permission (lokasi, sensor, mic) ditangani dengan benar
 - APK dapat diinstal dan didemokan end-to-end tanpa crash
 
@@ -100,4 +113,3 @@ Run the backend tests with:
 ```sh
 node --test backend/server.test.mjs
 ```
- 

@@ -96,7 +96,7 @@ final incidentApiProvider = Provider<IncidentApi>((ref) {
 });
 
 final incidentRepositoryProvider = Provider<IncidentRepository>((ref) {
-  return IncidentRepository(ref.watch(incidentApiProvider));
+  return IncidentRepository();
 });
 
 final incidentNotifierProvider =

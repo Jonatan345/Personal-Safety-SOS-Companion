@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'repositories/emergency_contact_repository.dart';
+import 'repositories/incident_repository.dart';
 import 'routes/app_routes.dart';
+import 'services/alert_service.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -12,6 +14,8 @@ Future<void> main() async {
   await Hive.initFlutter();
 
   await Hive.openBox<String>(HiveEmergencyContactRepository.boxName);
+  await Hive.openBox<String>(IncidentRepository.boxName);
+  await AlertService.instance.initialise();
   runApp(const ProviderScope(child: SosCompanionApp()));
 }
 
