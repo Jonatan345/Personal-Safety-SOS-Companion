@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:sos_companion/models/incident.dart';
 import 'package:sos_companion/notifiers/incident_notifier.dart';
+import 'package:sos_companion/models/emergency_contact.dart';
+import 'package:sos_companion/repositories/emergency_contact_repository.dart';
 import 'package:sos_companion/repositories/incident_repository.dart';
 import 'package:sos_companion/services/incident_api.dart';
 import 'package:sos_companion/screens/history_screen.dart';
@@ -40,12 +42,27 @@ class FakeIncidentRepository extends IncidentRepository {
   }
 }
 
+class FakeEmergencyContactRepository implements EmergencyContactRepository {
+  @override
+  Future<EmergencyContact?> fetchContact() async => null;
+
+  @override
+  Future<EmergencyContact> saveContact(EmergencyContactDraft draft) =>
+      throw UnimplementedError();
+}
+
 Widget createSubject(FakeIncidentRepository repository) {
   return ProviderScope(
-    overrides: [incidentRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      incidentRepositoryProvider.overrideWithValue(repository),
+      emergencyContactRepositoryProvider.overrideWithValue(
+        FakeEmergencyContactRepository(),
+      ),
+    ],
     child: MaterialApp(
       home: IncidentScreen(
-        locationProvider: () async => throw StateError('GPS unavailable in widget test'),
+        locationProvider: () async =>
+            throw StateError('GPS unavailable in widget test'),
       ),
       routes: {'/history': (_) => const HistoryScreen()},
     ),
@@ -63,6 +80,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.pump();
     }
+    await tester.pump();
 
     expect(repository.incidents, hasLength(1));
     expect(repository.incidents.single.status, 'sent');

@@ -92,20 +92,18 @@ class IncidentNotifier extends StateNotifier<AsyncValue<List<Incident>>> {
   }
 }
 
-final incidentApiProvider = Provider<IncidentApi>((ref) {
+final incidentApiProvider = Provider<IncidentApi?>((ref) {
   final client = http.Client();
   ref.onDispose(client.close);
   const configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
-  return IncidentApi(
-    baseUrl: configuredBaseUrl.isNotEmpty
-        ? configuredBaseUrl
-        : 'http://10.0.2.2:8080/api',
-    client: client,
-  );
+  // Location history is local-only unless the operator explicitly opts into a
+  // separately secured HTTPS service at build time.
+  if (configuredBaseUrl.isEmpty) return null;
+  return IncidentApi(baseUrl: configuredBaseUrl, client: client);
 });
 
 final incidentRepositoryProvider = Provider<IncidentRepository>((ref) {
-  return IncidentRepository();
+  return IncidentRepository(ref.watch(incidentApiProvider));
 });
 
 final incidentNotifierProvider =

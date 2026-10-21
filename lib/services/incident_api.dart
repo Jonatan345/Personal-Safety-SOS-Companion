@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -17,6 +18,7 @@ class IncidentApiException implements Exception {
 }
 
 class IncidentApi {
+  static const _requestTimeout = Duration(seconds: 15);
   final String baseUrl;
   final http.Client _client;
 
@@ -24,7 +26,7 @@ class IncidentApi {
       : _client = client;
 
   Future<List<Incident>> getIncidents() async {
-    final response = await _client.get(_collectionUri);
+    final response = await _send(() => _client.get(_collectionUri));
     _ensureSuccess(response);
 
     final decoded = _decodeJson(response.body);
@@ -46,10 +48,12 @@ class IncidentApi {
   }
 
   Future<Incident> createIncident(Incident incident) async {
-    final response = await _client.post(
-      _collectionUri,
-      headers: const {'content-type': 'application/json'},
-      body: jsonEncode(incident.toJson()),
+    final response = await _send(
+      () => _client.post(
+        _collectionUri,
+        headers: const {'content-type': 'application/json'},
+        body: jsonEncode(incident.toJson()),
+      ),
     );
     _ensureSuccess(response);
 
@@ -58,16 +62,18 @@ class IncidentApi {
   }
 
   Future<void> updateIncident(Incident incident) async {
-    final response = await _client.patch(
-      _itemUri(incident.id),
-      headers: const {'content-type': 'application/json'},
-      body: jsonEncode(incident.toJson()),
+    final response = await _send(
+      () => _client.patch(
+        _itemUri(incident.id),
+        headers: const {'content-type': 'application/json'},
+        body: jsonEncode(incident.toJson()),
+      ),
     );
     _ensureSuccess(response);
   }
 
   Future<void> deleteIncident(String id) async {
-    final response = await _client.delete(_itemUri(id));
+    final response = await _send(() => _client.delete(_itemUri(id)));
     _ensureSuccess(response);
   }
 
@@ -88,6 +94,16 @@ class IncidentApi {
 
   Uri _itemUri(String id) =>
       Uri.parse('${_collectionUri.toString()}/${Uri.encodeComponent(id)}');
+
+  Future<http.Response> _send(Future<http.Response> Function() request) async {
+    try {
+      return await request().timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const IncidentApiException('The incidents request timed out.');
+    } on http.ClientException {
+      throw const IncidentApiException('Unable to connect to the incidents API.');
+    }
+  }
 
   dynamic _decodeJson(String body) {
     try {

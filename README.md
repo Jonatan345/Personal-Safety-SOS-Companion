@@ -78,18 +78,18 @@ node backend/server.mjs
 ```
 
 The backend listens on `http://0.0.0.0:8080`; incident data is stored in the
-ignored file `backend/data/incidents.json`. The Android emulator can reach the
-host machine at `http://10.0.2.2:8080/api`, which is the app's default API URL.
-For Flutter web or desktop, configure `http://localhost:8080/api`. For a
-physical device, use the computer's LAN IP. For a deployed HTTPS backend,
-configure the base URL at launch. In each case the app appends `/incidents`:
+ignored file `backend/data/incidents.json`. The mobile app does **not** sync
+history by default: emergency contacts and location history stay on-device.
+If a separately secured HTTPS backend is deliberately deployed, opt in by
+configuring its base URL at launch; the app appends `/incidents`:
 
 ```sh
 flutter run --dart-define=API_BASE_URL=https://your-deployed-api.example/api
 ```
 
 This backend is intended for local demos and testing only. It has no
-authentication and is not a publicly deployed service.
+authentication, so it must not be exposed publicly or used for real location
+data.
 
 The API contract used by the app is:
 

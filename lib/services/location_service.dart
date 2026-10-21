@@ -5,9 +5,19 @@ class LocationService {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw StateError('Layanan lokasi perangkat sedang nonaktif.');
     }
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission().timeout(
+        const Duration(seconds: 12),
+      );
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      throw StateError('Izin lokasi diperlukan untuk mengambil posisi SOS.');
+    }
     final position = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
+    ).timeout(const Duration(seconds: 15));
     return IncidentLocation(position.latitude, position.longitude);
   }
 }
