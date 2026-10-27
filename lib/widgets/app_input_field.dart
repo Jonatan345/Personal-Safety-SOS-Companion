@@ -7,6 +7,10 @@ class AppInputField extends StatelessWidget {
   final TextInputType keyboardType;
   final String? Function(String?)? validator;
   final IconData? prefixIcon;
+  final TextInputAction textInputAction;
+  final FocusNode? focusNode;
+  final void Function(String)? onFieldSubmitted;
+  final String? helperText;
 
   const AppInputField({
     super.key,
@@ -16,26 +20,28 @@ class AppInputField extends StatelessWidget {
     this.keyboardType = TextInputType.text,
     this.validator,
     this.prefixIcon,
+    this.textInputAction = TextInputAction.next,
+    this.focusNode,
+    this.onFieldSubmitted,
+    this.helperText,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          validator: validator,
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20) : null,
-          ),
-        ),
-      ],
+    return TextFormField(
+      controller: controller,
+      focusNode: focusNode,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onFieldSubmitted,
+      validator: validator,
+      scrollPadding: const EdgeInsets.all(24),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        helperText: helperText,
+        prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20) : null,
+      ),
     );
   }
 }

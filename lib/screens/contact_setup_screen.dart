@@ -19,12 +19,16 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _nameFocusNode = FocusNode();
+  final _phoneFocusNode = FocusNode();
   bool _showForm = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _nameFocusNode.dispose();
+    _phoneFocusNode.dispose();
     super.dispose();
   }
 
@@ -51,6 +55,14 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Kontak darurat berhasil disimpan')),
       );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            savedState?.submitError ?? 'Kontak gagal disimpan. Coba lagi.',
+          ),
+        ),
+      );
     }
   }
 
@@ -60,6 +72,7 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Kontak Darurat')),
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: state.when(
           loading: () => const _InitialLoadingState(),
@@ -73,6 +86,8 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
             formKey: _formKey,
             nameController: _nameController,
             phoneController: _phoneController,
+            nameFocusNode: _nameFocusNode,
+            phoneFocusNode: _phoneFocusNode,
             onAddOrEdit: () => _openForm(viewState.contact),
             onCancel: () => setState(() => _showForm = false),
             onSubmit: () => _submit(viewState),
@@ -133,6 +148,8 @@ class _ContactContent extends StatelessWidget {
     required this.formKey,
     required this.nameController,
     required this.phoneController,
+    required this.nameFocusNode,
+    required this.phoneFocusNode,
     required this.onAddOrEdit,
     required this.onCancel,
     required this.onSubmit,
@@ -143,6 +160,8 @@ class _ContactContent extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController nameController;
   final TextEditingController phoneController;
+  final FocusNode nameFocusNode;
+  final FocusNode phoneFocusNode;
   final VoidCallback onAddOrEdit;
   final VoidCallback onCancel;
   final Future<void> Function() onSubmit;
@@ -152,22 +171,111 @@ class _ContactContent extends StatelessWidget {
     final contact = viewState.contact;
     return ListView(
       padding: const EdgeInsets.all(20),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
-        if (contact == null && !showForm)
-          _EmptyContactState(onAddContact: onAddOrEdit)
-        else if (showForm)
-          _ContactForm(
-            formKey: formKey,
-            nameController: nameController,
-            phoneController: phoneController,
-            isSubmitting: viewState.isSubmitting,
-            submitError: viewState.submitError,
-            onSubmit: onSubmit,
-            onCancel: onCancel,
-          )
-        else
-          _LoadedContactState(contact: contact!, onEdit: onAddOrEdit),
+        SizedBox(
+          width: double.infinity,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 700;
+                  if (contact == null && !showForm) {
+                    return _EmptyContactState(onAddContact: onAddOrEdit);
+                  }
+                  if (!showForm) {
+                    return _LoadedContactState(
+                      contact: contact!,
+                      onEdit: onAddOrEdit,
+                    );
+                  }
+
+                  final form = _ContactForm(
+                    formKey: formKey,
+                    nameController: nameController,
+                    phoneController: phoneController,
+                    nameFocusNode: nameFocusNode,
+                    phoneFocusNode: phoneFocusNode,
+                    isSubmitting: viewState.isSubmitting,
+                    submitError: viewState.submitError,
+                    onSubmit: onSubmit,
+                    onCancel: onCancel,
+                  );
+                  final summary = AnimatedBuilder(
+                    animation: Listenable.merge([
+                      nameController,
+                      phoneController,
+                    ]),
+                    builder: (context, _) => _ContactSummary(
+                      name: nameController.text,
+                      phoneNumber: phoneController.text,
+                    ),
+                  );
+                  if (!wide) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        form,
+                        const SizedBox(height: 20),
+                        summary,
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: form),
+                      const SizedBox(width: 24),
+                      Expanded(child: summary),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _ContactSummary extends StatelessWidget {
+  const _ContactSummary({required this.name, required this.phoneNumber});
+
+  final String name;
+  final String phoneNumber;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      key: const Key('contact-summary'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.shield_outlined, color: AppColors.primary, size: 32),
+          const SizedBox(height: 12),
+          Text(
+            name.trim().isEmpty ? 'Kontak darurat' : name.trim(),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            phoneNumber.trim().isEmpty
+                ? 'Nomor telepon akan tampil di sini'
+                : phoneNumber.trim(),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Kontak ini akan menerima pemberitahuan saat SOS dikirim.',
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Pastikan nama dan nomor telepon sudah benar sebelum menyimpan.',
+            style: TextStyle(fontSize: 13),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -254,6 +362,8 @@ class _ContactForm extends StatelessWidget {
     required this.formKey,
     required this.nameController,
     required this.phoneController,
+    required this.nameFocusNode,
+    required this.phoneFocusNode,
     required this.isSubmitting,
     required this.submitError,
     required this.onSubmit,
@@ -263,6 +373,8 @@ class _ContactForm extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController nameController;
   final TextEditingController phoneController;
+  final FocusNode nameFocusNode;
+  final FocusNode phoneFocusNode;
   final bool isSubmitting;
   final String? submitError;
   final Future<void> Function() onSubmit;
@@ -273,6 +385,7 @@ class _ContactForm extends StatelessWidget {
     return Form(
       key: formKey,
       child: AppCard(
+        key: const Key('contact-form'),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -283,7 +396,10 @@ class _ContactForm extends StatelessWidget {
               label: 'Nama Kontak',
               hint: 'Contoh: Ibu Sari',
               controller: nameController,
+              focusNode: nameFocusNode,
               prefixIcon: Icons.person_outline,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => phoneFocusNode.requestFocus(),
               validator: (value) => (value == null || value.trim().isEmpty)
                   ? 'Nama wajib diisi'
                   : null,
@@ -293,23 +409,37 @@ class _ContactForm extends StatelessWidget {
               label: 'Nomor Telepon',
               hint: 'Contoh: 911, 112, atau +1 555 123 4567',
               controller: phoneController,
+              focusNode: phoneFocusNode,
               keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => onSubmit(),
+              helperText: 'Nomor ini digunakan untuk alert darurat.',
               prefixIcon: Icons.phone_outlined,
               validator: _validatePhoneNumber,
             ),
             if (submitError != null) ...[
               const SizedBox(height: 12),
-              Text(submitError!,
-                  style: const TextStyle(color: AppColors.danger)),
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  submitError!,
+                  style: const TextStyle(color: AppColors.danger),
+                ),
+              ),
             ],
             const SizedBox(height: 20),
             PrimaryButton(
               label: 'Simpan Kontak',
               loading: isSubmitting,
+              loadingLabel: 'Menyimpan kontak...',
               onPressed: onSubmit,
             ),
             TextButton(
               onPressed: isSubmitting ? null : onCancel,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                tapTargetSize: MaterialTapTargetSize.padded,
+              ),
               child: const Text('Batal'),
             ),
           ],

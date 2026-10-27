@@ -11,9 +11,14 @@ class HistoryScreen extends ConsumerWidget {
   Future<void> _runAction(
     BuildContext context,
     Future<void> Function() action,
+    String successMessage,
   ) async {
     try {
       await action();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(successMessage)),
+      );
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -33,106 +38,122 @@ class HistoryScreen extends ConsumerWidget {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => _ErrorState(
             error: error,
-            onRetry: () => ref.read(incidentNotifierProvider.notifier).refresh(),
+            onRetry: () =>
+                ref.read(incidentNotifierProvider.notifier).refresh(),
           ),
           data: (incidents) => incidents.isEmpty
               ? const _EmptyState()
               : RefreshIndicator(
                   onRefresh: () =>
                       ref.read(incidentNotifierProvider.notifier).refresh(),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(20),
-                    itemCount: incidents.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, i) {
-                      final item = incidents[i];
-                      final sent = item.status == 'sent';
-                      return Dismissible(
-                        key: ValueKey(item.id),
-                        direction: DismissDirection.endToStart,
-                        onDismissed: (_) => _runAction(
-                          context,
-                          () => ref
-                              .read(incidentNotifierProvider.notifier)
-                              .deleteIncident(item.id),
-                        ),
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          decoration: BoxDecoration(
-                            color: AppColors.danger,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: const Icon(Icons.delete_outline,
-                              color: Colors.white),
-                        ),
-                        child: GestureDetector(
-                          onTap: () => _runAction(
-                            context,
-                            () => ref
-                                .read(incidentNotifierProvider.notifier)
-                                .updateStatus(
-                                  item.id,
-                                  sent ? 'cancelled' : 'sent',
-                                ),
-                          ),
-                          child: AppCard(
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: (sent
-                                            ? AppColors.danger
-                                            : AppColors.textSecondary)
-                                        .withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(
-                                    sent
-                                        ? Icons.warning_amber_rounded
-                                        : Icons.cancel_outlined,
-                                    color: sent
-                                        ? AppColors.danger
-                                        : AppColors.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${item.timestamp.day}/${item.timestamp.month}/${item.timestamp.year} • '
-                                        '${item.timestamp.hour}:${item.timestamp.minute.toString().padLeft(2, '0')}',
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w600),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1100),
+                      child: ListView.separated(
+                        padding: const EdgeInsets.all(20),
+                        itemCount: incidents.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, i) {
+                          final item = incidents[i];
+                          final sent = item.status == 'sent';
+                          return Dismissible(
+                            key: ValueKey(item.id),
+                            direction: DismissDirection.endToStart,
+                            onDismissed: (_) => _runAction(
+                              context,
+                              () => ref
+                                  .read(incidentNotifierProvider.notifier)
+                                  .deleteIncident(item.id),
+                              'Insiden berhasil dihapus.',
+                            ),
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              decoration: BoxDecoration(
+                                color: AppColors.danger,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: const Icon(Icons.delete_outline,
+                                  color: Colors.white),
+                            ),
+                            child: Semantics(
+                              button: true,
+                              label:
+                                  'Insiden ${item.timestamp.day}/${item.timestamp.month}/${item.timestamp.year}, status ${sent ? 'terkirim' : 'dibatalkan'}',
+                              hint: 'Ketuk untuk mengubah status insiden',
+                              child: GestureDetector(
+                                onTap: () => _runAction(
+                                  context,
+                                  () => ref
+                                      .read(incidentNotifierProvider.notifier)
+                                      .updateStatus(
+                                        item.id,
+                                        sent ? 'cancelled' : 'sent',
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${item.latitude.toStringAsFixed(4)}, ${item.longitude.toStringAsFixed(4)}',
-                                        style: const TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 12,
+                                  'Status insiden berhasil diperbarui.',
+                                ),
+                                child: AppCard(
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: (sent
+                                                  ? AppColors.danger
+                                                  : AppColors.textSecondary)
+                                              .withValues(alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
+                                        child: Icon(
+                                          sent
+                                              ? Icons.warning_amber_rounded
+                                              : Icons.cancel_outlined,
+                                          color: sent
+                                              ? AppColors.danger
+                                              : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${item.timestamp.day}/${item.timestamp.month}/${item.timestamp.year} • '
+                                              '${item.timestamp.hour}:${item.timestamp.minute.toString().padLeft(2, '0')}',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w600),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${item.latitude.toStringAsFixed(4)}, ${item.longitude.toStringAsFixed(4)}',
+                                              style: const TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      StatusBadge(
+                                        label: sent ? 'Terkirim' : 'Dibatalkan',
+                                        color: sent
+                                            ? AppColors.danger
+                                            : AppColors.textSecondary,
                                       ),
                                     ],
                                   ),
                                 ),
-                                StatusBadge(
-                                  label: sent ? 'Terkirim' : 'Dibatalkan',
-                                  color: sent
-                                      ? AppColors.danger
-                                      : AppColors.textSecondary,
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                      );
-                    },
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
         ),
@@ -193,9 +214,11 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.inbox_outlined, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+          Icon(Icons.inbox_outlined,
+              size: 56, color: AppColors.textSecondary.withValues(alpha: 0.5)),
           const SizedBox(height: 12),
-          const Text('Belum ada riwayat insiden', style: TextStyle(color: AppColors.textSecondary)),
+          const Text('Belum ada riwayat insiden',
+              style: TextStyle(color: AppColors.textSecondary)),
           const SizedBox(height: 4),
           const Text('Insiden yang tercatat akan muncul di sini',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),

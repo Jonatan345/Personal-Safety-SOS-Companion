@@ -25,16 +25,112 @@ class FakeEmergencyContactRepository implements EmergencyContactRepository {
   }
 }
 
-Widget createSubject(EmergencyContactRepository repository) {
+Widget createSubject(
+  EmergencyContactRepository repository, {
+  double textScale = 1,
+}) {
   return ProviderScope(
     overrides: [
       emergencyContactRepositoryProvider.overrideWithValue(repository)
     ],
-    child: const MaterialApp(home: ContactSetupScreen()),
+    child: MaterialApp(
+      home: const ContactSetupScreen(),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(textScale),
+        ),
+        child: child!,
+      ),
+    ),
   );
 }
 
 void main() {
+  testWidgets('uses stacked form and summary on a narrow screen',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(createSubject(FakeEmergencyContactRepository()));
+    await tester.pump();
+    await tester.tap(find.text('Tambah Kontak Darurat'));
+    await tester.pump();
+
+    final form = tester.getRect(find.byKey(const Key('contact-form')));
+    final summary = tester.getRect(find.byKey(const Key('contact-summary')));
+    expect(summary.top, greaterThan(form.bottom));
+  });
+
+  testWidgets('uses two columns and keeps values when resized wide',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(createSubject(FakeEmergencyContactRepository()));
+    await tester.pump();
+    await tester.tap(find.text('Tambah Kontak Darurat'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextFormField).at(0), 'Ibu Sari');
+    await tester.enterText(find.byType(TextFormField).at(1), '08123456789');
+
+    tester.view.physicalSize = const Size(800, 1280);
+    await tester.pumpAndSettle();
+
+    final form = tester.getRect(find.byKey(const Key('contact-form')));
+    final summary = tester.getRect(find.byKey(const Key('contact-summary')));
+    expect(summary.left, greaterThan(form.right));
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('contact-summary')),
+        matching: find.text('Ibu Sari'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('contact-summary')),
+        matching: find.text('08123456789'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('keeps the last field and save action reachable with keyboard',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetViewInsets();
+    });
+
+    await tester.pumpWidget(createSubject(FakeEmergencyContactRepository()));
+    await tester.pump();
+    await tester.tap(find.text('Tambah Kontak Darurat'));
+    await tester.pump();
+    final phoneField = find.byType(TextFormField).at(1);
+    await tester.tap(phoneField);
+    await tester.pumpAndSettle();
+
+    expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
+    expect(find.text('Nomor Telepon'), findsOneWidget);
+    expect(find.text('Simpan Kontak'), findsOneWidget);
+    expect(
+      tester.getRect(find.text('Simpan Kontak')).bottom,
+      lessThanOrEqualTo(480),
+    );
+  });
+
   testWidgets('shows initial loading while contact data is fetched',
       (tester) async {
     final completer = Completer<EmergencyContact?>();
@@ -44,6 +140,21 @@ void main() {
     );
 
     expect(find.byKey(const Key('contact-initial-loading')), findsOneWidget);
+  });
+
+  testWidgets('keeps form controls usable with 200 percent text scaling',
+      (tester) async {
+    await tester.pumpWidget(
+      createSubject(FakeEmergencyContactRepository(), textScale: 2),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Tambah Kontak Darurat'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nama Kontak'), findsOneWidget);
+    expect(find.text('Nomor Telepon'), findsOneWidget);
+    expect(find.text('Simpan Kontak'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('shows empty state when no contact has been saved',
@@ -125,6 +236,7 @@ void main() {
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Menyimpan kontak...'), findsOneWidget);
     expect(tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
         isNull);
     expect(saveCount, 1);
@@ -135,5 +247,27 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('contact-data-state')), findsOneWidget);
+  });
+
+  testWidgets('shows inline and snackbar feedback when saving fails',
+      (tester) async {
+    final repository = FakeEmergencyContactRepository(
+      onSave: (_) => Future.error(Exception('offline')),
+    );
+    await tester.pumpWidget(createSubject(repository));
+    await tester.pump();
+    await tester.tap(find.text('Tambah Kontak Darurat'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextFormField).at(0), 'Ibu Sari');
+    await tester.enterText(find.byType(TextFormField).at(1), '08123456789');
+
+    await tester.tap(find.text('Simpan Kontak'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Kontak gagal disimpan. Silakan coba lagi.'),
+      findsNWidgets(2),
+    );
+    expect(find.byKey(const Key('contact-form')), findsOneWidget);
   });
 }
