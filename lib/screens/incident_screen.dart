@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/emergency_contact.dart';
 import '../models/incident.dart';
 import '../notifiers/incident_notifier.dart';
 import '../repositories/emergency_contact_repository.dart';
 import '../services/alert_service.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/sos_message.dart';
 import '../widgets/primary_button.dart';
 
 class IncidentScreen extends ConsumerStatefulWidget {
-  const IncidentScreen({super.key, this.locationProvider});
+  const IncidentScreen({super.key, this.locationProvider, this.alerts});
   final Future<IncidentLocation> Function()? locationProvider;
+  final AlertGateway? alerts;
   @override
   ConsumerState<IncidentScreen> createState() => _IncidentScreenState();
 }
@@ -41,63 +44,76 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       _error = null;
     });
     timer?.cancel();
+
+    // Ambil semua dependensi sebelum await pertama: alert tetap berjalan
+    // walaupun layar ini sudah ditutup.
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final incidents = ref.read(incidentNotifierProvider.notifier);
+    final contacts = ref.read(emergencyContactRepositoryProvider);
+    final alerts = widget.alerts ?? AlertService.instance;
+
     try {
-      var latitude = 0.0, longitude = 0.0;
+      double? latitude;
+      double? longitude;
+      String? locationFailure;
       if (status == 'sent') {
         try {
           final position = await (widget.locationProvider?.call() ??
               LocationService().currentPosition());
           latitude = position.latitude;
           longitude = position.longitude;
-        } catch (_) {
-          // The local SOS record remains available when GPS is temporarily off.
+        } catch (error) {
+          // Lokasi gagal: simpan null (bukan 0,0) dan beri tahu pengguna.
+          locationFailure = locationFailureMessage(error);
         }
       }
-      final incident = Incident(
+      await incidents.addIncident(Incident(
           id: DateTime.now().microsecondsSinceEpoch.toString(),
           timestamp: DateTime.now(),
           latitude: latitude,
           longitude: longitude,
-          status: status);
-      await ref.read(incidentNotifierProvider.notifier).addIncident(incident);
-      if (status == 'sent') {
-        try {
-          final contact =
-              await ref.read(emergencyContactRepositoryProvider).fetchContact();
-          final message =
-              'SOS: kemungkinan insiden terdeteksi. Lokasi saya: https://maps.google.com/?q=$latitude,$longitude';
-          // Platform channels (notifications/SMS apps) must never delay saving
-          // an SOS record or returning the user to its history.
-          unawaited(
-            AlertService.instance
-                .showEmergencyNotification(
-                  contact == null
-                      ? 'Insiden tersimpan. Atur kontak untuk mengirim SMS.'
-                      : 'Alert siap dikirim ke ${contact.name}.',
-                )
-                .catchError((_) {}),
-          );
-          if (contact != null) {
-            unawaited(
-              AlertService.instance
-                  .openSmsComposer(phone: contact.phoneNumber, message: message)
-                  .then<void>((_) {}, onError: (_, __) {}),
-            );
-          }
-        } catch (_) {
-          // A missing SMS app must not discard a saved emergency incident.
-        }
+          status: status));
+
+      if (status != 'sent') {
+        if (mounted) navigator.pop();
+        return;
       }
-      if (!mounted) return;
-      status == 'sent'
-          ? Navigator.pushReplacementNamed(context, '/history')
-          : Navigator.pop(context);
+
+      EmergencyContact? contact;
+      String? contactFailure;
+      try {
+        contact = await contacts.fetchContact();
+      } catch (_) {
+        contactFailure = 'Kontak darurat tidak dapat dimuat.';
+      }
+
+      final notes = <String>[
+        if (locationFailure != null)
+          '$locationFailure Alert tetap dikirim tanpa lokasi.',
+        if (contactFailure != null) contactFailure,
+        if (contact == null && contactFailure == null)
+          'Kontak darurat belum diatur, SMS tidak disiapkan.',
+      ];
+      final message = buildSosMessage(latitude: latitude, longitude: longitude);
+
+      if (mounted) navigator.pushReplacementNamed('/history');
+      // Kanal platform (notifikasi/SMS) tidak boleh menunda penyimpanan
+      // insiden maupun perpindahan ke riwayat.
+      unawaited(_dispatchAlerts(
+        alerts: alerts,
+        messenger: messenger,
+        contact: contact,
+        message: message,
+        notes: notes,
+      ));
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isCompleting = false;
           _error = '$error';
         });
+      }
     }
   }
 
@@ -157,4 +173,39 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                             : () => _finishIncident('cancelled'),
                         loading: _isCompleting),
                   ]))));
+}
+
+/// Mengirim notifikasi lalu SMS. Setiap kegagalan ditampilkan ke pengguna
+/// lewat SnackBar (tidak ada lagi error yang ditelan diam-diam).
+Future<void> _dispatchAlerts({
+  required AlertGateway alerts,
+  required ScaffoldMessengerState messenger,
+  required EmergencyContact? contact,
+  required String message,
+  required List<String> notes,
+}) async {
+  final notificationFailure = await alerts.showEmergencyNotification(
+    contact == null
+        ? 'Insiden tersimpan. Atur kontak untuk mengirim SMS.'
+        : 'Alert siap dikirim ke ${contact.name}.',
+  );
+  if (notificationFailure != null) notes.add(notificationFailure);
+  // Tampilkan sebelum SMS dibuka, karena aplikasi SMS memindahkan app ke latar.
+  _showNotes(messenger, notes);
+
+  if (contact == null) return;
+  final smsFailure = await alerts.openSmsComposer(
+    phone: contact.phoneNumber,
+    message: message,
+  );
+  if (smsFailure != null) _showNotes(messenger, [smsFailure]);
+}
+
+void _showNotes(ScaffoldMessengerState messenger, List<String> notes) {
+  if (notes.isEmpty || !messenger.mounted) return;
+  messenger.showSnackBar(SnackBar(
+    content: Text(notes.join('\n')),
+    duration: const Duration(seconds: 10),
+    showCloseIcon: true,
+  ));
 }

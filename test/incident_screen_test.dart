@@ -3,14 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:sos_companion/models/emergency_contact.dart';
 import 'package:sos_companion/models/incident.dart';
 import 'package:sos_companion/notifiers/incident_notifier.dart';
-import 'package:sos_companion/models/emergency_contact.dart';
 import 'package:sos_companion/repositories/emergency_contact_repository.dart';
 import 'package:sos_companion/repositories/incident_repository.dart';
-import 'package:sos_companion/services/incident_api.dart';
 import 'package:sos_companion/screens/history_screen.dart';
 import 'package:sos_companion/screens/incident_screen.dart';
+import 'package:sos_companion/services/alert_service.dart';
+import 'package:sos_companion/services/incident_api.dart';
+import 'package:sos_companion/services/location_service.dart';
 
 class FakeIncidentRepository extends IncidentRepository {
   FakeIncidentRepository()
@@ -43,30 +45,79 @@ class FakeIncidentRepository extends IncidentRepository {
 }
 
 class FakeEmergencyContactRepository implements EmergencyContactRepository {
+  FakeEmergencyContactRepository([this.contact]);
+  final EmergencyContact? contact;
+
   @override
-  Future<EmergencyContact?> fetchContact() async => null;
+  Future<EmergencyContact?> fetchContact() async => contact;
 
   @override
   Future<EmergencyContact> saveContact(EmergencyContactDraft draft) =>
       throw UnimplementedError();
 }
 
-Widget createSubject(FakeIncidentRepository repository) {
+class FakeAlerts implements AlertGateway {
+  FakeAlerts({this.notificationFailure, this.smsFailure});
+  final String? notificationFailure;
+  final String? smsFailure;
+  final notifications = <String>[];
+  final smsMessages = <String>[];
+
+  @override
+  Future<String?> showEmergencyNotification(String body) async {
+    notifications.add(body);
+    return notificationFailure;
+  }
+
+  @override
+  Future<String?> openSmsComposer({
+    required String phone,
+    required String message,
+  }) async {
+    smsMessages.add(message);
+    return smsFailure;
+  }
+}
+
+const _contact = EmergencyContact(
+  id: 'c1',
+  name: 'Ibu Sari',
+  phoneNumber: '081234567890',
+);
+
+Future<IncidentLocation> _gpsOff() async =>
+    throw StateError('Layanan lokasi perangkat sedang nonaktif.');
+
+Widget createSubject(
+  FakeIncidentRepository repository, {
+  FakeAlerts? alerts,
+  EmergencyContact? contact,
+  Future<IncidentLocation> Function()? location,
+}) {
   return ProviderScope(
     overrides: [
       incidentRepositoryProvider.overrideWithValue(repository),
       emergencyContactRepositoryProvider.overrideWithValue(
-        FakeEmergencyContactRepository(),
+        FakeEmergencyContactRepository(contact),
       ),
     ],
     child: MaterialApp(
       home: IncidentScreen(
-        locationProvider: () async =>
-            throw StateError('GPS unavailable in widget test'),
+        locationProvider: location ?? _gpsOff,
+        alerts: alerts ?? FakeAlerts(),
       ),
       routes: {'/history': (_) => const HistoryScreen()},
     ),
   );
+}
+
+Future<void> runCountdown(WidgetTester tester) async {
+  for (var second = 0; second < 10; second++) {
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+  }
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
 }
 
 void main() {
@@ -75,12 +126,7 @@ void main() {
   ) async {
     final repository = FakeIncidentRepository();
     await tester.pumpWidget(createSubject(repository));
-
-    for (var second = 0; second < 10; second++) {
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pump();
-    }
-    await tester.pump();
+    await runCountdown(tester);
 
     expect(repository.incidents, hasLength(1));
     expect(repository.incidents.single.status, 'sent');
@@ -91,12 +137,70 @@ void main() {
     tester,
   ) async {
     final repository = FakeIncidentRepository();
-    await tester.pumpWidget(createSubject(repository));
+    final alerts = FakeAlerts();
+    await tester.pumpWidget(createSubject(repository, alerts: alerts));
 
     await tester.tap(find.text('Batalkan (Ini Bukan Darurat)'));
     await tester.pumpAndSettle();
 
     expect(repository.incidents, hasLength(1));
     expect(repository.incidents.single.status, 'cancelled');
+    expect(alerts.smsMessages, isEmpty);
+  });
+
+  testWidgets('failed GPS stores null location, no fake map link, tells user', (
+    tester,
+  ) async {
+    final repository = FakeIncidentRepository();
+    final alerts = FakeAlerts();
+    await tester.pumpWidget(
+      createSubject(repository, alerts: alerts, contact: _contact),
+    );
+    await runCountdown(tester);
+
+    final saved = repository.incidents.single;
+    expect(saved.latitude, isNull);
+    expect(saved.longitude, isNull);
+    expect(saved.hasLocation, isFalse);
+    expect(alerts.smsMessages.single, isNot(contains('maps.google.com')));
+    expect(alerts.smsMessages.single, contains('tidak tersedia'));
+    expect(find.textContaining('Alert tetap dikirim tanpa lokasi'),
+        findsOneWidget);
+  });
+
+  testWidgets('successful GPS stores coordinates and sends the map link', (
+    tester,
+  ) async {
+    final repository = FakeIncidentRepository();
+    final alerts = FakeAlerts();
+    await tester.pumpWidget(createSubject(
+      repository,
+      alerts: alerts,
+      contact: _contact,
+      location: () async => const IncidentLocation(-6.2088, 106.8456),
+    ));
+    await runCountdown(tester);
+
+    expect(repository.incidents.single.latitude, -6.2088);
+    expect(repository.incidents.single.longitude, 106.8456);
+    expect(alerts.smsMessages.single,
+        contains('https://maps.google.com/?q=-6.2088,106.8456'));
+  });
+
+  testWidgets('denied notification permission is reported, SMS still opens', (
+    tester,
+  ) async {
+    final repository = FakeIncidentRepository();
+    final alerts = FakeAlerts(
+      notificationFailure: 'Izin notifikasi belum diberikan.',
+    );
+    await tester.pumpWidget(
+      createSubject(repository, alerts: alerts, contact: _contact),
+    );
+    await runCountdown(tester);
+
+    expect(find.textContaining('Izin notifikasi belum diberikan'),
+        findsOneWidget);
+    expect(alerts.smsMessages, hasLength(1));
   });
 }

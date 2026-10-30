@@ -159,6 +159,21 @@ async function readIncident(request, response) {
   return incident;
 }
 
+function isCoordinate(value, limit) {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= -limit &&
+    value <= limit
+  );
+}
+
+// Lokasi boleh null (GPS gagal), tetapi harus null KEDUANYA atau valid KEDUANYA.
+function hasValidLocation(value) {
+  if (value.latitude === null && value.longitude === null) return true;
+  return isCoordinate(value.latitude, 90) && isCoordinate(value.longitude, 180);
+}
+
 function isIncident(value) {
   return (
     value != null &&
@@ -167,14 +182,7 @@ function isIncident(value) {
     value.id.trim().length > 0 &&
     typeof value.timestamp === 'string' &&
     Number.isFinite(Date.parse(value.timestamp)) &&
-    typeof value.latitude === 'number' &&
-    Number.isFinite(value.latitude) &&
-    value.latitude >= -90 &&
-    value.latitude <= 90 &&
-    typeof value.longitude === 'number' &&
-    Number.isFinite(value.longitude) &&
-    value.longitude >= -180 &&
-    value.longitude <= 180 &&
+    hasValidLocation(value) &&
     validStatuses.has(value.status)
   );
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:geolocator/geolocator.dart';
 
 class LocationService {
@@ -26,4 +28,13 @@ class IncidentLocation {
   const IncidentLocation(this.latitude, this.longitude);
   final double latitude;
   final double longitude;
+}
+
+/// Alasan gagal lokasi dalam bahasa yang bisa dibaca pengguna.
+String locationFailureMessage(Object error) {
+  if (error is StateError) return error.message;
+  if (error is TimeoutException) {
+    return 'Pengambilan lokasi melewati batas waktu.';
+  }
+  return 'Lokasi tidak dapat diambil.';
 }

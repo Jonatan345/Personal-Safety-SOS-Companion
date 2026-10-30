@@ -129,7 +129,7 @@ class HistoryScreen extends ConsumerWidget {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              '${item.latitude.toStringAsFixed(4)}, ${item.longitude.toStringAsFixed(4)}',
+                                              item.locationLabel,
                                               style: const TextStyle(
                                                 color: AppColors.textSecondary,
                                                 fontSize: 12,

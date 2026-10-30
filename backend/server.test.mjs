@@ -89,3 +89,24 @@ test('rejects invalid incident data', async () => {
   });
   assert.equal(response.status, 400);
 });
+
+// TAMBAHKAN dua test ini di akhir backend/server.test.mjs.
+test('accepts an incident whose location is unavailable (null coordinates)', async () => {
+  const noLocation = { ...incident, id: 'incident-2', latitude: null, longitude: null };
+  const created = await fetch(`${baseUrl}/api/incidents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(noLocation),
+  });
+  assert.equal(created.status, 201);
+  assert.deepEqual(await created.json(), noLocation);
+});
+
+test('rejects an incident with only one coordinate', async () => {
+  const response = await fetch(`${baseUrl}/api/incidents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...incident, longitude: null }),
+  });
+  assert.equal(response.status, 400);
+});

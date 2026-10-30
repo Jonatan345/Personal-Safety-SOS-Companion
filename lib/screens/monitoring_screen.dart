@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../services/monitoring_service.dart';
 import '../services/permission_service.dart';
@@ -71,6 +72,10 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         return;
       }
 
+      // Izin notifikasi bukan prasyarat monitoring: diminta tanpa memblokir
+      // sensor dan tanpa ditunggu.
+      unawaited(_requestNotificationPermission(attempt));
+
       late final MonitoringController service;
       service = _monitoringFactory(
         onTrigger: (source) => _onTrigger(source, attempt, service),
@@ -94,6 +99,28 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   }
 
   bool _isCurrentAttempt(int attempt) => mounted && attempt == _startAttempt;
+
+    Future<void> _requestNotificationPermission(int attempt) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await _permissions.requestNotificationPermission();
+    final message = result.message;
+    if (!_isCurrentAttempt(attempt) || message == null) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 10),
+          showCloseIcon: true,
+          action: result.needsSettings
+              ? SnackBarAction(
+                  label: 'Pengaturan',
+                  onPressed: openAppSettings,
+                )
+              : null,
+        ),
+      );
+  }
 
   Future<void> _disposeMonitoring() async {
     final service = _monitoring;

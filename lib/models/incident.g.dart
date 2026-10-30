@@ -13,8 +13,8 @@ class IncidentAdapter extends TypeAdapter<Incident> {
     return Incident(
       id: fields[0] as String,
       timestamp: fields[1] as DateTime,
-      latitude: fields[2] as double,
-      longitude: fields[3] as double,
+      latitude: fields[2] as double?,
+      longitude: fields[3] as double?,
       status: fields[4] as String,
     );
   }
