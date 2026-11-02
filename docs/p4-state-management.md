@@ -51,15 +51,15 @@ Perintah yang dijalankan:
 flutter test test/contact_setup_screen_test.dart
 ```
 
-`test/contact_setup_screen_test.dart` berisi **81 test** (tata letak layar sempit dan
+`test/contact_setup_screen_test.dart` berisi **11 test** (tata letak layar sempit dan
 lebar, keyboard aktif, teks 200%, dan feedback gagal simpan).
 
 Hasil ketika semua test lulus:
 
-```text
-+81: All tests passed!
-```
+(2026-11-02) 00:07 +11: All tests passed! 
 
+
+`test keseluruhan` berisi **81 test**
 (2026-11-02) 00:12 +39: C:/projects/Personal-Safety-SOS-Companion/test/incident_repository_test.dart: a corrupted record is skipped instead of failing the whole history
 Melewati catatan insiden rusak: FormatException: Unexpected character (at character 2)
 {bukan-json
