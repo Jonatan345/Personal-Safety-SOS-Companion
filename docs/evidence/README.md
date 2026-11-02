@@ -1,30 +1,42 @@
-# P4 Visual Evidence
+# Bukti (Evidence)
 
-Add one of the following before submitting P4:
+## P4 — alur Kontak Darurat
 
-- `p4-contact-flow.png` — screenshot of the empty state, validation message,
-  submit loading, and saved-contact state; or
-- `p4-contact-flow.mp4` — a 10–20 second screen recording of the same flow.
+Berkas bukti visual: `p4-contact-flow.png` **atau** `p4-contact-flow.mp4`
+(screenshot atau rekaman 10–20 detik dari HP). Langkah pengambilan ada di
+`../p4-state-management.md`.
 
-The automated proof is available in `../p4-state-management.md` and
-`test/contact_setup_screen_test.dart`.
+Bukti otomatis: `../p4-state-management.md` dan
+`../../test/contact_setup_screen_test.dart`.
 
-## P5 Demo Evidence
+## P5 — Local Data & Persistence
+
 Video CRUD dan persistence: <https://youtu.be/JmwPUNWhOu0>
 
-## P8 Responsive UX Evidence
+Test otomatis: `../../test/incident_repository_test.dart` (create, read,
+update, delete, data tetap ada setelah box ditutup dan dibuka lagi, catatan
+rusak dilewati).
 
-The P8 form screenshots cover the emergency-contact form at 360 × 800 and
-800 × 1280. The open variants show the phone field focused in the desktop
-browser capture; this browser does not render a mobile software keyboard. The
-keyboard inset itself is simulated in the widget test to verify the save action
-remains reachable:
+## P6 — Integrasi API
+
+Test otomatis: `../../test/incident_api_test.dart`,
+`../../test/incident_api_failure_test.dart` (timeout, error jaringan, HTTP,
+JSON rusak, pesan Bahasa Indonesia), dan bagian sinkronisasi di
+`../../test/incident_repository_test.dart`.
+
+## P8 — Responsive UX
+
+Screenshot form Kontak Darurat pada 360 × 800 dan 800 × 1280:
 
 - `p8-mobile-keyboard-closed.png`
 - `p8-mobile-keyboard-open.png`
 - `p8-wide-keyboard-closed.png`
 - `p8-wide-keyboard-open.png`
 
-Automated coverage for responsive layout, resize value retention, keyboard
-insets, 200% text scaling, and save feedback is in
-`../../test/contact_setup_screen_test.dart`.
+Catatan: varian keyboard terbuka diambil di browser desktop, yang tidak
+menampilkan keyboard layar HP. Untuk bukti yang lebih kuat, ambil ulang
+screenshot dari HP asli (keyboard benar-benar tampil) dan ganti berkas di atas.
+
+Test otomatis: `../../test/contact_setup_screen_test.dart` (layout, resize,
+inset keyboard, teks 200%, feedback simpan) dan `../../test/home_screen_test.dart`
+(tanpa overflow pada dua ukuran layar dan teks 200%, label pembaca layar).

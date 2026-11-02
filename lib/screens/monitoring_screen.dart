@@ -3,11 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../routes/app_routes.dart';
 import '../services/monitoring_service.dart';
 import '../services/permission_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_config.dart';
+import '../utils/error_messages.dart';
 import '../widgets/app_card.dart';
 import '../widgets/primary_button.dart';
+import '../widgets/responsive_body.dart';
+import '../widgets/state_views.dart';
 
 class MonitoringScreen extends StatefulWidget {
   const MonitoringScreen({
@@ -93,14 +98,14 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
           ? startingSensors
               ? 'Sensor belum siap. Periksa izin mikrofon dan sensor, lalu coba lagi.'
               : 'Permintaan izin mikrofon melewati batas waktu. Coba lagi.'
-          : 'Monitoring gagal dimulai: $error';
+          : 'Monitoring gagal dimulai. ${userMessageFor(error)}';
       await _handleStartFailure(attempt, message);
     }
   }
 
   bool _isCurrentAttempt(int attempt) => mounted && attempt == _startAttempt;
 
-    Future<void> _requestNotificationPermission(int attempt) async {
+  Future<void> _requestNotificationPermission(int attempt) async {
     final messenger = ScaffoldMessenger.of(context);
     final result = await _permissions.requestNotificationPermission();
     final message = result.message;
@@ -133,7 +138,8 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     try {
       await _disposeMonitoring();
     } catch (cleanupError) {
-      message = '$message Pembersihan sensor juga gagal: $cleanupError';
+      debugPrint('Pembersihan sensor gagal: $cleanupError');
+      message = '$message Pembersihan sensor juga gagal.';
     }
     _showFailure(attempt, message);
   }
@@ -152,25 +158,43 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     MonitoringController service,
   ) {
     if (!_isCurrentAttempt(attempt) || !identical(_monitoring, service)) return;
-    _showFailure(attempt, 'Sensor berhenti bekerja: $error');
+    _showFailure(attempt, 'Sensor berhenti bekerja. ${userMessageFor(error)}');
     unawaited(_disposeMonitoring().catchError((Object cleanupError) {
+      debugPrint('Pembersihan sensor gagal: $cleanupError');
       _showFailure(
         attempt,
-        'Sensor berhenti bekerja: $error. '
-        'Pembersihan sensor gagal: $cleanupError',
+        'Sensor berhenti bekerja. ${userMessageFor(error)} '
+        'Pembersihan sensor juga gagal.',
       );
     }));
   }
 
-  void _onTrigger(
-      TriggerSource source, int attempt, MonitoringController service) {
+  Future<void> _onTrigger(
+    TriggerSource source,
+    int attempt,
+    MonitoringController service,
+  ) async {
     if (!_isCurrentAttempt(attempt) ||
         !identical(_monitoring, service) ||
         _triggerHandled) {
       return;
     }
     _triggerHandled = true;
-    Navigator.pushNamed(context, '/incident', arguments: source.name);
+    try {
+      await Navigator.pushNamed(context, AppRoutes.incident,
+          arguments: source.name);
+    } finally {
+      // Monitoring harus tetap mendeteksi insiden berikutnya setelah pengguna
+      // membatalkan atau kembali dari layar insiden.
+      _triggerHandled = false;
+    }
+  }
+
+  void _stop() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Monitoring dihentikan')),
+    );
+    Navigator.pop(context);
   }
 
   @override
@@ -188,175 +212,170 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('Monitoring')),
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final content = _loading
-                  ? Center(
-                      child: Semantics(
-                        liveRegion: true,
-                        label: 'Memulai monitoring sensor',
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  : _error != null
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.lock_outline,
-                                size: 48,
-                                color: AppColors.danger,
-                                semanticLabel: 'Monitoring gagal',
-                              ),
-                              const SizedBox(height: 12),
-                              Semantics(
-                                liveRegion: true,
-                                child: Text(
-                                  _error!,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              FilledButton.icon(
-                                onPressed: _start,
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size(48, 48),
-                                ),
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Coba lagi'),
-                              ),
-                            ],
-                          ),
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            AppCard(
-                              child: Column(
-                                children: [
-                                  Container(
-                                    width: 90,
-                                    height: 90,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.success
-                                          .withValues(alpha: .12),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.sensors,
-                                      size: 40,
-                                      color: AppColors.success,
-                                      semanticLabel: 'Sensor aktif',
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Semantics(
-                                    liveRegion: true,
-                                    child: Text(
-                                      'Sensor Aktif',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text(
-                                    'Gerakan dan suara sekitar sedang dipantau.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            const _SensorRow(
-                              label: 'Accelerometer',
-                              value: 'Deteksi shake/fall',
-                              icon: Icons.vibration,
-                            ),
-                            const SizedBox(height: 10),
-                            const _SensorRow(
-                              label: 'GPS',
-                              value: 'Diambil saat insiden',
-                              icon: Icons.location_on_outlined,
-                            ),
-                            const SizedBox(height: 10),
-                            const _SensorRow(
-                              label: 'Mikrofon',
-                              value: 'Ambang 85 dB',
-                              icon: Icons.mic_none,
-                            ),
-                            const SizedBox(height: 20),
-                            PrimaryButton(
-                              label: 'Simulasikan Shake/Fall',
-                              icon: Icons.warning_amber_rounded,
-                              color: AppColors.danger,
-                              onPressed: () => _monitoring?.simulateMotion(),
-                            ),
-                            const SizedBox(height: 10),
-                            PrimaryButton(
-                              label: 'Hentikan Monitoring',
-                              color: AppColors.textSecondary,
-                              onPressed: () => Navigator.pop(context),
-                            ),
-                          ],
-                        );
-
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 760),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight - 40,
-                      ),
-                      child: content,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+        body: ResponsiveBody(
+          fillHeight: true,
+          builder: (context, wide) {
+            if (_loading) {
+              return const LoadingView(label: 'Memulai monitoring sensor…');
+            }
+            if (_error != null) return _buildError();
+            return _buildActive(wide);
+          },
         ),
       );
+
+  Widget _buildError() => StateMessageView(
+        icon: Icons.lock_outline,
+        iconColor: AppColors.danger,
+        title: _error!,
+        announce: true,
+        action: FilledButton.icon(
+          onPressed: _start,
+          style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+          icon: const Icon(Icons.refresh),
+          label: const Text('Coba lagi'),
+        ),
+      );
+
+  Widget _buildActive(bool wide) {
+    final status = AppCard(
+      child: Column(
+        children: [
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: .12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.sensors,
+              size: 40,
+              color: AppColors.success,
+              semanticLabel: 'Sensor aktif',
+            ),
+          ),
+          const SizedBox(height: 14),
+          Semantics(
+            liveRegion: true,
+            child: const Text(
+              'Sensor Aktif',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Gerakan dan suara sekitar sedang dipantau.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+
+    final sensors = Column(
+      children: [
+        const _SensorRow(
+          label: 'Accelerometer',
+          value: 'Deteksi shake/fall',
+          icon: Icons.vibration,
+        ),
+        const SizedBox(height: 10),
+        const _SensorRow(
+          label: 'GPS',
+          value: 'Diambil saat insiden',
+          icon: Icons.location_on_outlined,
+        ),
+        const SizedBox(height: 10),
+        _SensorRow(
+          label: 'Mikrofon',
+          value: 'Ambang ${SosConfig.soundThresholdDb.round()} dB',
+          icon: Icons.mic_none,
+        ),
+      ],
+    );
+
+    final actions = Column(
+      children: [
+        PrimaryButton(
+          label: 'Simulasikan Shake/Fall',
+          icon: Icons.warning_amber_rounded,
+          color: AppColors.danger,
+          onPressed: () => _monitoring?.simulateMotion(),
+        ),
+        const SizedBox(height: 10),
+        PrimaryButton(
+          label: 'Hentikan Monitoring',
+          color: AppColors.textSecondary,
+          onPressed: _stop,
+        ),
+      ],
+    );
+
+    if (wide) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              children: [status, const SizedBox(height: 16), sensors],
+            ),
+          ),
+          const SizedBox(width: 24),
+          Expanded(child: actions),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        status,
+        const SizedBox(height: 16),
+        sensors,
+        const SizedBox(height: 20),
+        actions,
+      ],
+    );
+  }
 }
 
 class _SensorRow extends StatelessWidget {
-  const _SensorRow(
-      {required this.label, required this.value, required this.icon});
+  const _SensorRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
   final String label, value;
   final IconData icon;
+
   @override
-  Widget build(BuildContext context) => AppCard(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.primary, size: 20, semanticLabel: ''),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                value,
-                textAlign: TextAlign.end,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
+  Widget build(BuildContext context) => MergeSemantics(
+        child: AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.primary, size: 20, semanticLabel: ''),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
 }

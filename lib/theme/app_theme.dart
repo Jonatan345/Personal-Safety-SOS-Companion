@@ -14,10 +14,11 @@ class AppColors {
 
 class AppTheme {
   static ThemeData light() {
+    // Memakai font sistem (Roboto di Android). Tidak ada fontFamily khusus
+    // karena tidak ada berkas font yang dibundel di pubspec.yaml.
     return ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: AppColors.background,
-      fontFamily: 'Inter',
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         primary: AppColors.primary,

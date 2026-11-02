@@ -6,6 +6,7 @@ class PrimaryButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData? icon;
   final Color color;
+  final Color foregroundColor;
   final bool loading;
   final String? loadingLabel;
 
@@ -15,6 +16,7 @@ class PrimaryButton extends StatelessWidget {
     this.onPressed,
     this.icon,
     this.color = AppColors.primary,
+    this.foregroundColor = Colors.white,
     this.loading = false,
     this.loadingLabel,
   });
@@ -29,7 +31,9 @@ class PrimaryButton extends StatelessWidget {
           onPressed: loading ? null : onPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: color,
-            foregroundColor: Colors.white,
+            foregroundColor: foregroundColor,
+            disabledBackgroundColor: color,
+            disabledForegroundColor: foregroundColor,
             elevation: 0,
             minimumSize: const Size(48, 52),
             shape:
@@ -43,12 +47,12 @@ class PrimaryButton extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 22,
                         height: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.4,
-                          color: Colors.white,
+                          color: foregroundColor,
                         ),
                       ),
                       const SizedBox(width: 10),

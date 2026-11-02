@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:noise_meter/noise_meter.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
+import '../utils/app_config.dart';
+
 enum TriggerSource { motion, sound }
 
 typedef MonitoringErrorCallback = void Function(Object error);
@@ -51,7 +53,9 @@ class MonitoringService implements MonitoringController {
         (event) {
           final magnitude =
               sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-          if (magnitude >= 25) _trigger(TriggerSource.motion);
+          if (magnitude >= SosConfig.accelerationThreshold) {
+            _trigger(TriggerSource.motion);
+          }
         },
         onError: _reportStreamError,
         onDone: () => _reportStreamEnded('accelerometer'),
@@ -60,7 +64,9 @@ class MonitoringService implements MonitoringController {
       _noiseMeter = NoiseMeter();
       _noise = (_noiseStream?.call() ?? _noiseMeter!.noise).listen(
         (reading) {
-          if (reading.meanDecibel >= 85) _trigger(TriggerSource.sound);
+          if (reading.meanDecibel >= SosConfig.soundThresholdDb) {
+            _trigger(TriggerSource.sound);
+          }
         },
         onError: _reportStreamError,
         onDone: () => _reportStreamEnded('microphone'),
@@ -101,7 +107,7 @@ class MonitoringService implements MonitoringController {
     if (_disposed || !_started) return;
     final now = DateTime.now();
     if (_lastTrigger != null &&
-        now.difference(_lastTrigger!) < const Duration(seconds: 12)) {
+        now.difference(_lastTrigger!) < SosConfig.triggerCooldown) {
       return;
     }
     _lastTrigger = now;

@@ -1,5 +1,3 @@
-// ignore: unnecessary_import
-import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 /// One shared, idempotent bootstrap for Hive.
@@ -7,6 +5,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 /// before accessing a box.
 class LocalStorageService {
   LocalStorageService._();
+
+  // Versioned namespaces avoid reading incompatible Hive data from older demos.
+  // Satu-satunya tempat nama box didefinisikan.
+  static const contactsBox = 'emergency_contacts_v2';
+  static const incidentsBox = 'incidents_v2';
 
   static Future<void>? _ready;
 
@@ -22,11 +25,11 @@ class LocalStorageService {
 
   static Future<void> _open() async {
     await Hive.initFlutter();
-    if (!Hive.isBoxOpen('emergency_contacts_v2')) {
-      await Hive.openBox<String>('emergency_contacts_v2');
+    if (!Hive.isBoxOpen(contactsBox)) {
+      await Hive.openBox<String>(contactsBox);
     }
-    if (!Hive.isBoxOpen('incidents_v2')) {
-      await Hive.openBox<String>('incidents_v2');
+    if (!Hive.isBoxOpen(incidentsBox)) {
+      await Hive.openBox<String>(incidentsBox);
     }
   }
 }

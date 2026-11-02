@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hanya untuk build debug: izinkan HTTP ke backend demo di jaringan lokal
+     (mis. http://192.168.x.x:8080/api). Build release memakai file di
+     src/main yang melarang cleartext. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

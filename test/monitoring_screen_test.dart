@@ -10,12 +10,23 @@ import 'package:sos_companion/services/monitoring_service.dart';
 import 'package:sos_companion/services/permission_service.dart';
 
 class FakePermissionService extends PermissionService {
-  FakePermissionService(this.request);
+  FakePermissionService(
+    this.request, {
+    this.notification = const NotificationPermissionResult(
+      status: PermissionStatus.granted,
+    ),
+  });
 
   final Future<PermissionResult> Function() request;
+  final NotificationPermissionResult notification;
 
   @override
   Future<PermissionResult> requestMonitoringPermissions() => request();
+
+  // Tanpa override ini, test memanggil plugin asli dan meninggalkan timer 12 detik.
+  @override
+  Future<NotificationPermissionResult> requestNotificationPermission() async =>
+      notification;
 }
 
 class FakeMonitoringController implements MonitoringController {
@@ -54,12 +65,14 @@ const _denied = PermissionResult(microphone: PermissionStatus.denied);
 Widget _subject({
   required PermissionService permissions,
   required MonitoringServiceFactory factory,
+  Map<String, WidgetBuilder> routes = const {},
 }) {
   return MaterialApp(
     home: MonitoringScreen(
       permissionService: permissions,
       monitoringFactory: factory,
     ),
+    routes: routes,
   );
 }
 
@@ -170,6 +183,69 @@ void main() {
     expect(controllers.first.disposeCount, 1);
     expect(events, ['start', 'dispose', 'start']);
     expect(find.text('Sensor Aktif'), findsOneWidget);
+  });
+
+  testWidgets(
+      'denied notification permission shows a notice but monitoring still starts',
+      (tester) async {
+    await tester.pumpWidget(_subject(
+      permissions: FakePermissionService(
+        () async => _granted,
+        notification: const NotificationPermissionResult(
+          status: PermissionStatus.denied,
+        ),
+      ),
+      factory: ({required onTrigger, required onError}) =>
+          FakeMonitoringController(
+        startResult: Future<void>.value(),
+        onTrigger: onTrigger,
+        onError: onError,
+        events: [],
+      ),
+    ));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Sensor Aktif'), findsOneWidget);
+    expect(find.textContaining('Izin notifikasi belum diberikan'),
+        findsOneWidget);
+  });
+
+  testWidgets(
+      'monitoring still detects a new incident after returning from the previous one',
+      (tester) async {
+    await tester.pumpWidget(_subject(
+      permissions: FakePermissionService(() async => _granted),
+      factory: ({required onTrigger, required onError}) =>
+          FakeMonitoringController(
+        startResult: Future<void>.value(),
+        onTrigger: onTrigger,
+        onError: onError,
+        events: [],
+      ),
+      routes: {
+        '/incident': (context) => Scaffold(
+              body: Center(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Kembali dari insiden'),
+                ),
+              ),
+            ),
+      },
+    ));
+    await tester.pumpAndSettle();
+
+    for (var round = 1; round <= 2; round++) {
+      await tester.ensureVisible(find.text('Simulasikan Shake/Fall'));
+      await tester.tap(find.text('Simulasikan Shake/Fall'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kembali dari insiden'), findsOneWidget,
+          reason: 'insiden ke-$round harus membuka layar insiden');
+      await tester.tap(find.text('Kembali dari insiden'));
+      await tester.pumpAndSettle();
+    }
   });
 }
 

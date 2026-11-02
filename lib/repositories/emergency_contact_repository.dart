@@ -12,8 +12,7 @@ abstract class EmergencyContactRepository {
 }
 
 class HiveEmergencyContactRepository implements EmergencyContactRepository {
-  // Versioned namespace avoids reading incompatible Hive data from older demos.
-  static const String boxName = 'emergency_contacts_v2';
+  static const String boxName = LocalStorageService.contactsBox;
   static const String contactKey = 'primary-contact';
 
   Box<String> get _box => Hive.box<String>(boxName);

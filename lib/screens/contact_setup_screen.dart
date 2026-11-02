@@ -7,6 +7,8 @@ import '../theme/app_theme.dart';
 import '../widgets/app_card.dart';
 import '../widgets/app_input_field.dart';
 import '../widgets/primary_button.dart';
+import '../widgets/responsive_body.dart';
+import '../widgets/state_views.dart';
 
 class ContactSetupScreen extends ConsumerStatefulWidget {
   const ContactSetupScreen({super.key});
@@ -75,10 +77,24 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: state.when(
-          loading: () => const _InitialLoadingState(),
-          error: (_, __) => _LoadErrorState(
-            onRetry: () =>
-                ref.read(emergencyContactNotifierProvider.notifier).retry(),
+          loading: () => const LoadingView(
+            key: Key('contact-initial-loading'),
+            label: 'Memuat kontak darurat…',
+          ),
+          error: (_, __) => StateMessageView(
+            key: const Key('contact-load-error'),
+            icon: Icons.error_outline,
+            iconColor: AppColors.danger,
+            title: 'Kontak darurat tidak dapat dimuat',
+            announce: true,
+            action: OutlinedButton.icon(
+              key: const Key('contact-retry-button'),
+              onPressed: () =>
+                  ref.read(emergencyContactNotifierProvider.notifier).retry(),
+              style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba lagi'),
+            ),
           ),
           data: (viewState) => _ContactContent(
             viewState: viewState,
@@ -92,49 +108,6 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
             onCancel: () => setState(() => _showForm = false),
             onSubmit: () => _submit(viewState),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InitialLoadingState extends StatelessWidget {
-  const _InitialLoadingState();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      key: Key('contact-initial-loading'),
-      child: CircularProgressIndicator(),
-    );
-  }
-}
-
-class _LoadErrorState extends StatelessWidget {
-  const _LoadErrorState({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      key: const Key('contact-load-error'),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: AppColors.danger, size: 52),
-            const SizedBox(height: 12),
-            const Text('Kontak darurat tidak dapat dimuat'),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              key: const Key('contact-retry-button'),
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Coba lagi'),
-            ),
-          ],
         ),
       ),
     );
@@ -173,66 +146,53 @@ class _ContactContent extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1100),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final wide = constraints.maxWidth >= 700;
-                  if (contact == null && !showForm) {
-                    return _EmptyContactState(onAddContact: onAddOrEdit);
-                  }
-                  if (!showForm) {
-                    return _LoadedContactState(
-                      contact: contact!,
-                      onEdit: onAddOrEdit,
-                    );
-                  }
+        ContentWidth(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = Breakpoints.isWide(constraints.maxWidth);
+              if (contact == null && !showForm) {
+                return _EmptyContactState(onAddContact: onAddOrEdit);
+              }
+              if (!showForm) {
+                return _LoadedContactState(
+                  contact: contact!,
+                  onEdit: onAddOrEdit,
+                );
+              }
 
-                  final form = _ContactForm(
-                    formKey: formKey,
-                    nameController: nameController,
-                    phoneController: phoneController,
-                    nameFocusNode: nameFocusNode,
-                    phoneFocusNode: phoneFocusNode,
-                    isSubmitting: viewState.isSubmitting,
-                    submitError: viewState.submitError,
-                    onSubmit: onSubmit,
-                    onCancel: onCancel,
-                  );
-                  final summary = AnimatedBuilder(
-                    animation: Listenable.merge([
-                      nameController,
-                      phoneController,
-                    ]),
-                    builder: (context, _) => _ContactSummary(
-                      name: nameController.text,
-                      phoneNumber: phoneController.text,
-                    ),
-                  );
-                  if (!wide) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        form,
-                        const SizedBox(height: 20),
-                        summary,
-                      ],
-                    );
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: form),
-                      const SizedBox(width: 24),
-                      Expanded(child: summary),
-                    ],
-                  );
-                },
-              ),
-            ),
+              final form = _ContactForm(
+                formKey: formKey,
+                nameController: nameController,
+                phoneController: phoneController,
+                nameFocusNode: nameFocusNode,
+                phoneFocusNode: phoneFocusNode,
+                isSubmitting: viewState.isSubmitting,
+                submitError: viewState.submitError,
+                onSubmit: onSubmit,
+                onCancel: onCancel,
+              );
+              final summary = AnimatedBuilder(
+                animation: Listenable.merge([nameController, phoneController]),
+                builder: (context, _) => _ContactSummary(
+                  name: nameController.text,
+                  phoneNumber: phoneController.text,
+                ),
+              );
+              if (!wide) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [form, const SizedBox(height: 20), summary],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: form),
+                  const SizedBox(width: 24),
+                  Expanded(child: summary),
+                ],
+              );
+            },
           ),
         ),
       ],
@@ -289,26 +249,15 @@ class _EmptyContactState extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       key: const Key('contact-empty-state'),
-      child: Column(
-        children: [
-          const Icon(Icons.contact_phone_outlined,
-              color: AppColors.textSecondary, size: 48),
-          const SizedBox(height: 12),
-          const Text('Belum ada kontak darurat',
-              style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          const Text(
-            'Tambahkan satu kontak yang akan menerima alert darurat Anda.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 18),
-          PrimaryButton(
-            label: 'Tambah Kontak Darurat',
-            icon: Icons.add,
-            onPressed: onAddContact,
-          ),
-        ],
+      child: StateMessageView(
+        icon: Icons.contact_phone_outlined,
+        title: 'Belum ada kontak darurat',
+        message: 'Tambahkan satu kontak yang akan menerima alert darurat Anda.',
+        action: PrimaryButton(
+          label: 'Tambah Kontak Darurat',
+          icon: Icons.add,
+          onPressed: onAddContact,
+        ),
       ),
     );
   }

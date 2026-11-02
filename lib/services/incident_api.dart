@@ -5,11 +5,39 @@ import 'package:http/http.dart' as http;
 
 import '../models/incident.dart';
 
+enum IncidentApiErrorKind {
+  timeout,
+  network,
+  http,
+  invalidResponse,
+  configuration,
+}
+
 class IncidentApiException implements Exception {
   final String message;
   final int? statusCode;
+  final IncidentApiErrorKind kind;
 
-  const IncidentApiException(this.message, {this.statusCode});
+  const IncidentApiException(
+    this.message, {
+    this.statusCode,
+    this.kind = IncidentApiErrorKind.invalidResponse,
+  });
+
+  /// Pesan untuk pengguna (Bahasa Indonesia). [message] hanya untuk log.
+  String get userMessage => switch (kind) {
+        IncidentApiErrorKind.timeout =>
+          'Server terlalu lama merespons. Coba lagi nanti.',
+        IncidentApiErrorKind.network =>
+          'Tidak dapat terhubung ke server. Periksa koneksi internet.',
+        IncidentApiErrorKind.http => (statusCode ?? 0) >= 500
+            ? 'Server sedang bermasalah (kode $statusCode). Coba lagi nanti.'
+            : 'Server menolak permintaan (kode $statusCode).',
+        IncidentApiErrorKind.invalidResponse =>
+          'Data dari server tidak valid.',
+        IncidentApiErrorKind.configuration =>
+          'Alamat server belum diatur dengan benar.',
+      };
 
   @override
   String toString() => statusCode == null
@@ -18,12 +46,16 @@ class IncidentApiException implements Exception {
 }
 
 class IncidentApi {
-  static const _requestTimeout = Duration(seconds: 15);
   final String baseUrl;
   final http.Client _client;
+  final Duration _requestTimeout;
 
-  IncidentApi({required this.baseUrl, required http.Client client})
-      : _client = client;
+  IncidentApi({
+    required this.baseUrl,
+    required http.Client client,
+    Duration requestTimeout = const Duration(seconds: 15),
+  })  : _client = client,
+        _requestTimeout = requestTimeout;
 
   Future<List<Incident>> getIncidents() async {
     final response = await _send(() => _client.get(_collectionUri));
@@ -87,6 +119,7 @@ class IncidentApi {
         uri.fragment.isNotEmpty) {
       throw const IncidentApiException(
         'Set a valid API_BASE_URL using --dart-define.',
+        kind: IncidentApiErrorKind.configuration,
       );
     }
     return Uri.parse('${value.replaceFirst(RegExp(r'/+$'), '')}/incidents');
@@ -99,9 +132,15 @@ class IncidentApi {
     try {
       return await request().timeout(_requestTimeout);
     } on TimeoutException {
-      throw const IncidentApiException('The incidents request timed out.');
+      throw const IncidentApiException(
+        'The incidents request timed out.',
+        kind: IncidentApiErrorKind.timeout,
+      );
     } on http.ClientException {
-      throw const IncidentApiException('Unable to connect to the incidents API.');
+      throw const IncidentApiException(
+        'Unable to connect to the incidents API.',
+        kind: IncidentApiErrorKind.network,
+      );
     }
   }
 
@@ -128,6 +167,7 @@ class IncidentApi {
       throw IncidentApiException(
         'The incidents request failed.',
         statusCode: response.statusCode,
+        kind: IncidentApiErrorKind.http,
       );
     }
   }

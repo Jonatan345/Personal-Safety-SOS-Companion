@@ -1,33 +1,24 @@
-import 'package:hive/hive.dart';
+import 'incident_status.dart';
 
-part 'incident.g.dart';
-
-@HiveType(typeId: 0)
-class Incident extends HiveObject {
-  @HiveField(0)
-  String id;
-
-  @HiveField(1)
-  DateTime timestamp;
-
-  /// null = lokasi tidak tersedia (GPS mati, izin ditolak, timeout, atau
-  /// insiden dibatalkan sebelum lokasi diambil). Jangan diganti 0.0.
-  @HiveField(2)
-  double? latitude;
-
-  @HiveField(3)
-  double? longitude;
-
-  @HiveField(4)
-  String status; // 'sent' | 'cancelled' | 'pending'
-
-  Incident({
+class Incident {
+  const Incident({
     required this.id,
     required this.timestamp,
     this.latitude,
     this.longitude,
     required this.status,
   });
+
+  final String id;
+  final DateTime timestamp;
+
+  /// null = lokasi tidak tersedia (GPS mati, izin ditolak, timeout, atau
+  /// insiden dibatalkan sebelum lokasi diambil). Jangan diganti 0.0.
+  final double? latitude;
+  final double? longitude;
+
+  /// Salah satu nilai di [IncidentStatus].
+  final String status;
 
   /// Data lama yang tersimpan sebagai 0,0 juga dianggap tidak punya lokasi.
   bool get hasLocation {
@@ -41,10 +32,18 @@ class Incident extends HiveObject {
     if (hasLocation) {
       return '${latitude!.toStringAsFixed(4)}, ${longitude!.toStringAsFixed(4)}';
     }
-    return status == 'cancelled'
+    return status == IncidentStatus.cancelled
         ? 'Lokasi tidak diambil (dibatalkan)'
         : 'Lokasi tidak tersedia';
   }
+
+  Incident copyWith({String? status}) => Incident(
+        id: id,
+        timestamp: timestamp,
+        latitude: latitude,
+        longitude: longitude,
+        status: status ?? this.status,
+      );
 
   factory Incident.fromJson(Map<String, dynamic> json) {
     final id = json['id'];
@@ -81,7 +80,7 @@ class Incident extends HiveObject {
     }
 
     if (status is! String ||
-        !const {'sent', 'cancelled', 'pending'}.contains(status)) {
+        !IncidentStatus.all.contains(status)) {
       throw const FormatException('Incident status is invalid.');
     }
 

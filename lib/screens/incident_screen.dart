@@ -1,13 +1,18 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/emergency_contact.dart';
 import '../models/incident.dart';
+import '../models/incident_status.dart';
 import '../notifiers/incident_notifier.dart';
 import '../repositories/emergency_contact_repository.dart';
+import '../routes/app_routes.dart';
 import '../services/alert_service.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_config.dart';
+import '../utils/error_messages.dart';
 import '../utils/sos_message.dart';
 import '../widgets/primary_button.dart';
 
@@ -20,7 +25,7 @@ class IncidentScreen extends ConsumerStatefulWidget {
 }
 
 class _IncidentScreenState extends ConsumerState<IncidentScreen> {
-  int secondsLeft = 10;
+  int secondsLeft = SosConfig.countdownSeconds;
   Timer? timer;
   bool _isCompleting = false;
   String? _error;
@@ -30,7 +35,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (secondsLeft <= 1) {
         t.cancel();
-        _finishIncident('sent');
+        _finishIncident(IncidentStatus.sent);
       } else {
         setState(() => secondsLeft--);
       }
@@ -57,7 +62,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       double? latitude;
       double? longitude;
       String? locationFailure;
-      if (status == 'sent') {
+      if (status == IncidentStatus.sent) {
         try {
           final position = await (widget.locationProvider?.call() ??
               LocationService().currentPosition());
@@ -68,14 +73,24 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           locationFailure = locationFailureMessage(error);
         }
       }
-      await incidents.addIncident(Incident(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
-          timestamp: DateTime.now(),
-          latitude: latitude,
-          longitude: longitude,
-          status: status));
 
-      if (status != 'sent') {
+      String? storageFailure;
+      try {
+        await incidents.addIncident(Incident(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            timestamp: DateTime.now(),
+            latitude: latitude,
+            longitude: longitude,
+            status: status));
+      } catch (_) {
+        // Gagal menyimpan riwayat tidak boleh menghentikan alert darurat.
+        storageFailure = 'Riwayat insiden gagal disimpan.';
+      }
+
+      if (status != IncidentStatus.sent) {
+        if (storageFailure != null && messenger.mounted) {
+          messenger.showSnackBar(SnackBar(content: Text(storageFailure)));
+        }
         if (mounted) navigator.pop();
         return;
       }
@@ -91,13 +106,14 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       final notes = <String>[
         if (locationFailure != null)
           '$locationFailure Alert tetap dikirim tanpa lokasi.',
+        if (storageFailure != null) storageFailure,
         if (contactFailure != null) contactFailure,
         if (contact == null && contactFailure == null)
           'Kontak darurat belum diatur, SMS tidak disiapkan.',
       ];
       final message = buildSosMessage(latitude: latitude, longitude: longitude);
 
-      if (mounted) navigator.pushReplacementNamed('/history');
+      if (mounted) navigator.pushReplacementNamed(AppRoutes.history);
       // Kanal platform (notifikasi/SMS) tidak boleh menunda penyimpanan
       // insiden maupun perpindahan ke riwayat.
       unawaited(_dispatchAlerts(
@@ -111,7 +127,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       if (mounted) {
         setState(() {
           _isCompleting = false;
-          _error = '$error';
+          _error = userMessageFor(error);
         });
       }
     }
@@ -124,55 +140,90 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    // Pembaca layar hanya diumumkan pada 5 detik terakhir agar tidak berisik.
+    final countdownLabel = secondsLeft <= 5
+        ? '$secondsLeft detik tersisa'
+        : 'Alert akan dikirim dalam hitungan detik';
+    return Scaffold(
       backgroundColor: AppColors.danger,
       body: SafeArea(
-          child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        color: Colors.white, size: 56),
-                    const SizedBox(height: 16),
-                    const Text('Mendeteksi Insiden',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 8),
-                    Text('Alert akan dikirim dalam $secondsLeft detik',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70)),
-                    const SizedBox(height: 24),
-                    Container(
-                        width: 120,
-                        height: 120,
-                        decoration: const BoxDecoration(
-                            color: Colors.white, shape: BoxShape.circle),
-                        alignment: Alignment.center,
-                        child: Text('$secondsLeft',
-                            style: const TextStyle(
-                                fontSize: 44,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.danger))),
-                    if (_error != null)
-                      Padding(
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: math.max(0.0, constraints.maxHeight - 48),
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline,
+                          color: Colors.white, size: 56),
+                      const SizedBox(height: 16),
+                      const Text('Mendeteksi Insiden',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 8),
+                      Text('Alert akan dikirim dalam $secondsLeft detik',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white)),
+                      const SizedBox(height: 24),
+                      Semantics(
+                        liveRegion: true,
+                        label: countdownLabel,
+                        excludeSemantics: true,
+                        child: Container(
+                          width: 120,
+                          height: 120,
+                          decoration: const BoxDecoration(
+                              color: Colors.white, shape: BoxShape.circle),
+                          alignment: Alignment.center,
+                          child: Text('$secondsLeft',
+                              style: const TextStyle(
+                                  fontSize: 44,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.danger)),
+                        ),
+                      ),
+                      if (_error != null)
+                        Padding(
                           padding: const EdgeInsets.only(top: 20),
-                          child: Text('Gagal: $_error',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.white))),
-                    const SizedBox(height: 32),
-                    PrimaryButton(
+                          child: Semantics(
+                            liveRegion: true,
+                            child: Text(_error!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.white)),
+                          ),
+                        ),
+                      const SizedBox(height: 32),
+                      PrimaryButton(
                         label: _isCompleting
                             ? 'Mengambil lokasi...'
                             : 'Batalkan (Ini Bukan Darurat)',
                         color: Colors.white,
+                        foregroundColor: AppColors.danger,
                         onPressed: _isCompleting
                             ? null
-                            : () => _finishIncident('cancelled'),
-                        loading: _isCompleting),
-                  ]))));
+                            : () => _finishIncident(IncidentStatus.cancelled),
+                        loading: _isCompleting,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Mengirim notifikasi lalu SMS. Setiap kegagalan ditampilkan ke pengguna
