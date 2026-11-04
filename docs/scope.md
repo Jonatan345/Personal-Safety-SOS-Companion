@@ -1,36 +1,36 @@
 # Project Scope — SOS Companion
 
 ## Problem Statement
-Solo commuters/students lack a quick way to alert emergency contacts
-when they fall, get into an accident, or feel unsafe while alone.
+Pengguna yang bepergian sendirian tidak punya cara cepat memberi tahu kontak
+darurat saat terjatuh, mengalami kecelakaan, atau merasa tidak aman.
 
 ## Target User
-Students/individuals who frequently travel or walk alone.
+Mahasiswa dan individu yang sering bepergian atau berjalan sendirian.
 
-## App Value
-Detects potential incidents (fall/shake or loud sound), captures the location
-and prepares an alert to an emergency contact without manual dialing.
+## Nilai Aplikasi
+Mendeteksi kemungkinan insiden (gerakan jatuh/guncangan atau suara keras),
+mengambil lokasi, dan menyiapkan alert ke kontak darurat tanpa menekan nomor
+secara manual.
 
 ## In Scope
-- Accelerometer-based fall/shake detection
-- Microphone amplitude threshold (85 dB) as secondary trigger
-- Countdown (10 s) + cancel to avoid false alarms
-- GPS location capture on trigger; if it fails the incident is stored with no
-  location and the user is told why
-- Local incident history (Hive): create, read, update status, delete
-- Local emergency contact (one contact) with validation
-- Device notification and SMS composer with a Google Maps link when a location
-  exists (the user confirms the final SMS send)
-- Runtime permissions: microphone (required for monitoring), notifications
-  (requested without blocking monitoring), location (requested at incident time)
-- Optional REST sync to a demo backend (`API_BASE_URL`)
+- Deteksi jatuh/guncangan dengan accelerometer
+- Ambang level suara mikrofon sebagai pemicu kedua
+- Hitung mundur dengan pembatalan untuk menghindari alarm palsu
+- Lokasi GPS saat insiden; jika gagal, insiden disimpan tanpa lokasi dan
+  pengguna diberi tahu alasannya
+- Riwayat insiden lokal (Hive): buat, baca, ubah catatan, hapus (dengan
+  konfirmasi dan urungkan)
+- Satu kontak darurat dengan validasi input
+- Notifikasi perangkat dan SMS composer berisi tautan peta jika lokasi ada
+  (pengguna menekan kirim)
+- Izin runtime: mikrofon (wajib untuk monitoring), notifikasi (tanpa
+  memblokir), lokasi (saat insiden)
+- Sinkronisasi opsional ke backend demo (`API_BASE_URL`)
 
 ## Out of Scope
-- Multiple emergency contacts
-- User accounts and a production/cloud backend (the Node.js backend is a local
-  demo only, with no authentication)
-- Monitoring while the app is closed or the screen is locked (no foreground
-  service); the monitoring screen must stay open
-- Fully automatic SMS sending without user confirmation
-- Real speech recognition (only amplitude threshold)
-- Wearable device integration
+- Banyak kontak darurat
+- Akun pengguna dan backend produksi (backend Node.js hanya demo tanpa autentikasi)
+- Monitoring saat aplikasi ditutup atau layar terkunci (tanpa foreground service)
+- Pengiriman SMS otomatis tanpa konfirmasi pengguna
+- Pengenalan suara (hanya ambang level suara)
+- Integrasi wearable

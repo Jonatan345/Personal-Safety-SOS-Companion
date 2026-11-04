@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../notifiers/emergency_contact_notifier.dart';
 import '../routes/app_routes.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_card.dart';
@@ -15,8 +17,10 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('SOS Companion')),
       body: ResponsiveBody(
         builder: (context, wide) {
-          final status = _StatusCard(
+          final status = _ReadinessCard(
             onStart: () => Navigator.pushNamed(context, AppRoutes.monitoring),
+            onSetupContact: () =>
+                Navigator.pushNamed(context, AppRoutes.contactSetup),
           );
           final menu = Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,13 +103,60 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.onStart});
+/// Kesiapan SOS berdasarkan data nyata: apakah kontak darurat sudah tersimpan.
+class _Readiness {
+  const _Readiness({
+    required this.icon,
+    required this.color,
+    required this.text,
+    this.needsContact = false,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String text;
+  final bool needsContact;
+}
+
+class _ReadinessCard extends ConsumerWidget {
+  const _ReadinessCard({required this.onStart, required this.onSetupContact});
 
   final VoidCallback onStart;
+  final VoidCallback onSetupContact;
+
+  _Readiness _describe(AsyncValue<EmergencyContactViewState> contact) {
+    return contact.when(
+      loading: () => const _Readiness(
+        icon: Icons.hourglass_empty,
+        color: AppColors.textSecondary,
+        text: 'Memeriksa kontak darurat…',
+      ),
+      error: (_, __) => const _Readiness(
+        icon: Icons.error_outline,
+        color: AppColors.danger,
+        text: 'Kontak darurat tidak dapat dimuat.',
+        needsContact: true,
+      ),
+      data: (state) => state.hasContact
+          ? _Readiness(
+              icon: Icons.check_circle_outline,
+              color: AppColors.success,
+              text: 'Alert akan disiapkan untuk ${state.contact!.name}.',
+            )
+          : const _Readiness(
+              icon: Icons.warning_amber_rounded,
+              color: AppColors.danger,
+              text: 'Belum ada kontak darurat. Atur dulu agar SMS alert '
+                  'bisa disiapkan.',
+              needsContact: true,
+            ),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final readiness = _describe(ref.watch(emergencyContactNotifierProvider));
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,15 +167,35 @@ class _StatusCard extends StatelessWidget {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Status Monitoring',
+                  'Kesiapan SOS',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text('Nonaktif',
-              style: TextStyle(color: AppColors.textSecondary)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(readiness.icon, color: readiness.color, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    readiness.text,
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (readiness.needsContact)
+            TextButton(
+              onPressed: onSetupContact,
+              style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+              child: const Text('Atur Kontak Darurat'),
+            ),
           const SizedBox(height: 16),
           PrimaryButton(
             label: 'Mulai Monitoring',

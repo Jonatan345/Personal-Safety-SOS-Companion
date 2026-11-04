@@ -30,8 +30,14 @@ class EmergencyContactViewState {
   }
 }
 
+/// Hasil satu kali simpan. Layar memakai nilai ini (bukan menebak dari state)
+/// untuk memilih pesan: `alreadySaving` berarti tap ganda yang diabaikan.
+enum ContactSaveResult { saved, failed, alreadySaving }
+
 class EmergencyContactNotifier
     extends AsyncNotifier<EmergencyContactViewState> {
+  static const saveFailureMessage = 'Kontak gagal disimpan. Silakan coba lagi.';
+
   @override
   Future<EmergencyContactViewState> build() => _loadContact();
 
@@ -45,9 +51,9 @@ class EmergencyContactNotifier
     state = await AsyncValue.guard(_loadContact);
   }
 
-  Future<void> save(EmergencyContactDraft draft) async {
+  Future<ContactSaveResult> save(EmergencyContactDraft draft) async {
     final current = state.valueOrNull ?? const EmergencyContactViewState();
-    if (current.isSubmitting) return;
+    if (current.isSubmitting) return ContactSaveResult.alreadySaving;
 
     state =
         AsyncData(current.copyWith(isSubmitting: true, clearSubmitError: true));
@@ -56,13 +62,14 @@ class EmergencyContactNotifier
       final contact =
           await ref.read(saveEmergencyContactUseCaseProvider)(draft);
       state = AsyncData(EmergencyContactViewState(contact: contact));
+      return ContactSaveResult.saved;
     } catch (_) {
+      // Kontak lama (jika ada) dipertahankan; kegagalan tidak boleh terlihat
+      // seperti sukses hanya karena kontak lama masih tersimpan.
       state = AsyncData(
-        current.copyWith(
-          isSubmitting: false,
-          submitError: 'Kontak gagal disimpan. Silakan coba lagi.',
-        ),
+        current.copyWith(isSubmitting: false, submitError: saveFailureMessage),
       );
+      return ContactSaveResult.failed;
     }
   }
 }

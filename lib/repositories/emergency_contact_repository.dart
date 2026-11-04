@@ -27,15 +27,7 @@ class HiveEmergencyContactRepository implements EmergencyContactRepository {
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Stored emergency contact is invalid.');
     }
-
-    final id = decoded['id'];
-    final name = decoded['name'];
-    final phoneNumber = decoded['phoneNumber'];
-    if (id is! String || name is! String || phoneNumber is! String) {
-      throw const FormatException('Stored emergency contact is incomplete.');
-    }
-
-    return EmergencyContact(id: id, name: name, phoneNumber: phoneNumber);
+    return EmergencyContact.fromJson(decoded);
   }
 
   @override
@@ -46,14 +38,7 @@ class HiveEmergencyContactRepository implements EmergencyContactRepository {
       name: draft.name,
       phoneNumber: draft.phoneNumber,
     );
-    await _box.put(
-      contactKey,
-      jsonEncode({
-        'id': contact.id,
-        'name': contact.name,
-        'phoneNumber': contact.phoneNumber,
-      }),
-    );
+    await _box.put(contactKey, jsonEncode(contact.toJson()));
     return contact;
   }
 }

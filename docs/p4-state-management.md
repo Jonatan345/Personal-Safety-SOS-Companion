@@ -45,29 +45,35 @@ Lokasi kode:
 
 ## Hasil Verifikasi
 
-Perintah yang dijalankan:
+Perintah verifikasi:
 
 ```powershell
 flutter test test/contact_setup_screen_test.dart
 ```
 
-`test/contact_setup_screen_test.dart` berisi **11 test** (tata letak layar sempit dan
-lebar, keyboard aktif, teks 200%, dan feedback gagal simpan).
+`test/contact_setup_screen_test.dart` berisi **15 test** dalam tiga kelompok:
 
-Hasil ketika semua test lulus:
+- 6 kondisi UI wajib P4 (tabel di atas),
+- 5 test kontrak perilaku form P9 (nama spasi, simpan berhasil, gagal lalu
+  mencoba lagi, gagal saat mengubah kontak lama, nilai bertahan saat lebar
+  layar berubah),
+- 4 test P8 (susunan layar sempit dan lebar, keyboard aktif, teks 200%).
 
-(2026-11-02) 00:07 +11: All tests passed! 
+Hasil run `flutter test test/contact_setup_screen_test.dart`
+(2026-11-04) 00:05 +15: All tests passed!
 
-
-`test keseluruhan` berisi **81 test**
-(2026-11-02) 00:12 +39: C:/projects/Personal-Safety-SOS-Companion/test/incident_repository_test.dart: a corrupted record is skipped instead of failing the whole history
+Hasil run `flutter test (keseluruhan)`
+(2026-11-04) 00:06 +74: C:/projects/Personal-Safety-SOS-Companion/test/incident_repository_test.dart: penyimpanan lokal (P5) a corrupted record is skipped instead of failing the whole history
 Melewati catatan insiden rusak: FormatException: Unexpected character (at character 2)
 {bukan-json
  ^
 
-(2026-11-02) 00:12 +48: C:/projects/Personal-Safety-SOS-Companion/test/incident_repository_test.dart: sinkronisasi dengan server server tidak dapat dihubungi: error Indonesia, data lokal utuh
-Sinkronisasi insiden ke server gagal: IncidentApiException: Unable to connect to the incidents API.
-(2026-11-02) 00:18 +81: All tests passed! 
+(2026-11-04) 00:06 +83: C:/projects/Personal-Safety-SOS-Companion/test/incident_repository_test.dart: sinkronisasi dengan server (P6) server tidak dapat dihubungi: error Indonesia, data lokal utuh
+Sinkronisasi (tambah insiden) gagal: IncidentApiException: Unable to connect to the incidents API.
+(2026-11-04) 00:09 +142: All tests passed!
+
+Hasil run `flutter test test/validation/contact_validation_test.dart`
+00:02 +22: All tests passed!
 
 ## Bukti Visual yang Dikumpulkan
 

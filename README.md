@@ -1,115 +1,85 @@
-# Personal-Safety-SOS-Companion
-Using phone's built-in sensor APIs together (not one sensor alone), handling permissions for each, and combining their data into one logic.
+# Personal Safety SOS Companion
 
-## Problem Statement
-Solo commuters/students lack a quick way to alert emergency contacts
-when they fall, get into an accident, or feel unsafe while alone.
+Aplikasi Flutter untuk keselamatan pribadi: mendeteksi kemungkinan insiden
+(jatuh/guncangan atau suara keras) memakai sensor bawaan HP, mengambil lokasi,
+dan menyiapkan alert ke satu kontak darurat. Tidak ada perangkat keras
+tambahan; semua sensor berasal dari HP.
 
-## Target User
-Students/individuals who frequently travel or walk alone.
+## Masalah dan pengguna
+Pengguna yang bepergian sendirian tidak punya cara cepat memberi tahu kontak
+darurat saat terjatuh, mengalami kecelakaan, atau merasa tidak aman. Target
+pengguna: mahasiswa dan individu yang sering bepergian atau berjalan sendirian.
 
-## App Value
-Automatically detects potential incidents (fall/shake) and sends
-location + alert to emergency contact without manual dialing.
+## Fitur
+- Deteksi jatuh/guncangan (accelerometer) dan suara keras (mikrofon)
+- Hitung mundur 10 detik dengan tombol batal; tombol kembali sistem juga dicatat sebagai batal
+- Lokasi GPS saat insiden; bila gagal, insiden disimpan **tanpa lokasi** dan pengguna diberi alasannya (tidak ada tautan peta palsu)
+- Satu kontak darurat dengan validasi input
+- Notifikasi perangkat dan SMS composer berisi tautan peta jika lokasi ada
+- Riwayat insiden lokal (Hive): lihat, ubah catatan, hapus dengan konfirmasi dan urungkan
+- Sinkronisasi opsional ke backend demo
+- Layout adaptif (layar kecil dan besar), aman untuk keyboard, mendukung pembaca layar dan teks 200%
 
-## MVP P7: fitur yang dapat didemokan
-- **Sensor**: accelerometer memicu alarm ketika percepatan melewati ambang shake/fall; mikrofon membaca amplitudo lingkungan dan memicu alarm pada 85 dB.
-- **Lokasi**: setelah countdown habis, aplikasi mengambil GPS berakurasi tinggi dan menyimpan koordinat pada riwayat lokal Hive.
-- **Notifikasi dan SMS**: notifikasi perangkat mengonfirmasi alert. Bila kontak tersedia, aplikasi membuka SMS composer perangkat dengan tautan Google Maps agar pengguna tetap memberi persetujuan akhir sebelum SMS dikirim.
-- **Izin dan state**: izin lokasi, mikrofon, dan notifikasi diminta sebelum monitoring dimulai; penolakan menampilkan pesan serta tombol coba lagi. Loading, empty, error, retry, dan pembatalan countdown juga tersedia.
+## Alur penggunaan
+1. Beranda menampilkan kesiapan SOS dari kontak darurat yang tersimpan; atur kontak lebih dulu.
+2. **Mulai Monitoring**: sensor aktif. Build debug/profile punya tombol *Simulasikan Shake/Fall* untuk uji; build rilis hanya memakai sensor.
+3. Saat terdeteksi, layar insiden menghitung mundur 10 detik. Batalkan jika bukan darurat.
+4. Jika tidak dibatalkan: lokasi diambil, insiden disimpan, riwayat terbuka, lalu notifikasi dan SMS composer disiapkan. Pengguna menekan kirim di aplikasi SMS.
+5. Setelah kembali, monitoring tetap berjalan.
 
-### Demo vertical slice
-1. Tambahkan satu kontak darurat dari **Kontak Darurat**.
-2. Ketuk **Mulai Monitoring** dan izinkan lokasi, mikrofon, serta notifikasi.
-3. Goyangkan perangkat kuat-kuat atau ketuk **Simulasikan Shake/Fall**.
-4. Biarkan countdown sepuluh detik selesai: GPS diambil, insiden tersimpan di Hive, notifikasi muncul, lalu SMS composer terbuka dengan lokasi.
-5. Periksa **Riwayat**. Gunakan tombol pembatalan sebelum countdown habis untuk mencatat insiden sebagai dibatalkan tanpa mengambil lokasi atau membuka SMS.
+## Izin
+| Izin | Kapan | Wajib |
+| --- | --- | --- |
+| Mikrofon | Saat Monitoring dimulai | Ya, untuk monitoring |
+| Notifikasi (Android 13+) | Saat Monitoring dimulai, tanpa memblokir | Tidak; tanpa izin ini notifikasi tidak muncul tetapi SMS tetap disiapkan |
+| Lokasi | Saat insiden | Tidak; tanpa lokasi insiden disimpan tanpa lokasi |
 
-## Must-Have Features
-- Real-time accelerometer-based fall/shake detection
-- GPS location capture triggered on incident
-- Countdown screen with cancel option (avoid false alarm)
-- Emergency contact input & validation
-- SMS/notification alert sent automatically to emergency contact
-- Incident history stored locally in Hive (time, location, status); REST sync is optional for the older P6 demo backend
-- Permission handling (location, sensors, microphone)
-- Loading, empty, and error states on all screens
-- Microphone amplitude threshold as secondary trigger
-  
-## In Scope
-- Accelerometer-based fall/shake detection
-- GPS location capture on trigger
-- Microphone amplitude threshold as secondary trigger
-- Countdown + cancel (avoid false alarm)
-- Local incident history log
-- SMS/notification alert to 1 emergency contact
+## Menjalankan
+```powershell
+flutter pub get
+flutter run
+```
+Jangan menjalankan `flutter clean` setiap kali menguji: instal ulang aplikasi
+menghapus data lokal.
 
-## Out of Scope
-- Multiple emergency contacts
-- Multi-user accounts
-- Real speech recognition (only amplitude threshold)
-- Wearable device integration
-
-## Success Criteria
-- Aplikasi berhasil mendeteksi shake/fall pattern via accelerometer
-- GPS location berhasil diambil otomatis saat incident terdeteksi
-- Countdown + cancel berfungsi (tidak trigger alert jika dibatalkan)
-- Alert/notifikasi berhasil terkirim ke emergency contact
-- Riwayat insiden tersimpan dan dimuat secara lokal, termasuk saat backend tidak aktif
-- Semua permission (lokasi, sensor, mic) ditangani dengan benar
-- APK dapat diinstal dan didemokan end-to-end tanpa crash
-
-## User Flow
-1. Home Screen → user set emergency contact (first time only)
-2. User tap "Start Monitoring" → Monitoring Screen aktif (accelerometer + mic jalan)
-3. Sensor deteksi shake/fall → auto-navigate ke Incident Detected Screen
-4. Countdown 10 detik muncul:
-   - Jika dibatalkan → kembali ke Monitoring Screen
-   - Jika tidak dibatalkan → GPS diambil → Alert terkirim ke emergency contact
-5. Incident tersimpan ke History Screen (waktu, lokasi, status)
-
-## Incident API (P6)
-
-The repository includes a small REST backend for local end-to-end demos. Start
-it with Node.js 20 or newer:
-
-```sh
+### Backend demo (opsional)
+```powershell
 node backend/server.mjs
+flutter run --dart-define=API_BASE_URL=http://<IP-laptop>:8080/api
 ```
+- Port default 8080 (ubah dengan variabel `PORT`); data disimpan di `backend/data/incidents.json`.
+- Endpoint: `GET/POST /api/incidents`, `PATCH/DELETE /api/incidents/:id`.
+- HP dan laptop harus berada di jaringan yang sama. HTTP hanya diizinkan pada build debug; build rilis memblokir cleartext.
+- Backend demo **tanpa autentikasi**: hanya untuk penggunaan lokal.
+- Tanpa `API_BASE_URL`, aplikasi sepenuhnya lokal.
 
-The backend listens on `http://0.0.0.0:8080`; incident data is stored in the
-ignored file `backend/data/incidents.json`. The mobile app does **not** sync
-history by default: emergency contacts and location history stay on-device.
-If a separately secured HTTPS backend is deliberately deployed, opt in by
-configuring its base URL at launch; the app appends `/incidents`:
-
-```sh
-flutter run --dart-define=API_BASE_URL=https://your-deployed-api.example/api
-```
-
-This backend is intended for local demos and testing only. It has no
-authentication, so it must not be exposed publicly or used for real location
-data.
-
-The API contract used by the app is:
-
-- `GET /incidents` returns a JSON array of incidents (an empty array means no history).
-- `POST /incidents` accepts and returns one incident as a JSON object.
-- `PATCH /incidents/{id}` accepts an updated incident object.
-- `DELETE /incidents/{id}` removes the incident.
-
-Incident objects use `id`, `timestamp` (ISO 8601), `latitude`, `longitude`, and
-`status` (`sent`, `cancelled`, or `pending`). History displays loading, empty,
-error, and success states, and allows retrying a failed load.
-
-Run the focused API/model unit tests with:
-
-```sh
-flutter test test/incident_api_test.dart
-```
-
-Run the backend tests with:
-
-```sh
+## Test
+```powershell
+flutter analyze
+flutter test
 node --test backend/server.test.mjs
 ```
+Penjelasan test, kontrak perilaku, dan refactor: `docs/p9-test-refactor.md`.
+Bug yang ditemukan dan test regresinya: `docs/bug-log.md`.
+
+## Dokumentasi
+- `ARCHITECTURE.md`: struktur, lapisan, alur, data
+- `docs/scope.md`: batas fitur
+- `docs/p4-state-management.md`: state management dan enam kondisi UI
+- `docs/p9-test-refactor.md`, `docs/bug-log.md`
+- `docs/evidence/`: bukti per pertemuan
+
+## Kriteria keberhasilan
+- Accelerometer dan mikrofon mendeteksi pemicu dan membuka layar insiden
+- GPS diambil otomatis; jika gagal, lokasi `null` dan pengguna diberi tahu
+- Hitung mundur dan pembatalan berfungsi; batal tidak menyiapkan SMS
+- Notifikasi dan SMS composer disiapkan; kegagalan ditampilkan dalam Bahasa Indonesia
+- Riwayat tersimpan lokal dan tetap ada setelah aplikasi dibuka kembali
+- Izin mikrofon, notifikasi, dan lokasi ditangani tanpa menghentikan fitur lain
+- APK dapat diinstal dan dijalankan end-to-end
+
+## Batasan
+- Monitoring hanya berjalan saat aplikasi terbuka di layar
+- SMS memerlukan penekanan tombol kirim oleh pengguna
+- Satu kontak darurat
+- Penghapusan yang gagal dikirim ke server dapat muncul kembali saat sinkronisasi

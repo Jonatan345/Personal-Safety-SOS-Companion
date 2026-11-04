@@ -63,20 +63,8 @@ class Incident {
     double? latitude;
     double? longitude;
     if (latitudeValue != null || longitudeValue != null) {
-      if (latitudeValue is! num ||
-          !latitudeValue.toDouble().isFinite ||
-          latitudeValue < -90 ||
-          latitudeValue > 90) {
-        throw const FormatException('Incident latitude is invalid.');
-      }
-      if (longitudeValue is! num ||
-          !longitudeValue.toDouble().isFinite ||
-          longitudeValue < -180 ||
-          longitudeValue > 180) {
-        throw const FormatException('Incident longitude is invalid.');
-      }
-      latitude = latitudeValue.toDouble();
-      longitude = longitudeValue.toDouble();
+      latitude = _coordinate(latitudeValue, 90, 'latitude');
+      longitude = _coordinate(longitudeValue, 180, 'longitude');
     }
 
     if (status is! String ||
@@ -91,6 +79,16 @@ class Incident {
       longitude: longitude,
       status: status,
     );
+  }
+
+  static double _coordinate(Object? value, double limit, String name) {
+    if (value is! num ||
+        !value.toDouble().isFinite ||
+        value < -limit ||
+        value > limit) {
+      throw FormatException('Incident $name is invalid.');
+    }
+    return value.toDouble();
   }
 
   Map<String, dynamic> toJson() => {

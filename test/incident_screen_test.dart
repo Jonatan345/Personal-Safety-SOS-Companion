@@ -1,117 +1,65 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:sos_companion/models/emergency_contact.dart';
-import 'package:sos_companion/models/incident.dart';
 import 'package:sos_companion/notifiers/incident_notifier.dart';
 import 'package:sos_companion/repositories/emergency_contact_repository.dart';
-import 'package:sos_companion/repositories/incident_repository.dart';
 import 'package:sos_companion/screens/history_screen.dart';
 import 'package:sos_companion/screens/incident_screen.dart';
-import 'package:sos_companion/services/alert_service.dart';
-import 'package:sos_companion/services/incident_api.dart';
 import 'package:sos_companion/services/location_service.dart';
+import 'package:sos_companion/theme/app_theme.dart';
 
-class FakeIncidentRepository extends IncidentRepository {
-  FakeIncidentRepository()
-      : super(
-          IncidentApi(
-            baseUrl: 'https://api.example.test',
-            client: MockClient((_) async => http.Response('[]', 200)),
-          ),
-        );
+import 'support/fakes.dart';
+import 'support/pump.dart';
 
-  final List<Incident> incidents = [];
-
-  @override
-  Future<List<Incident>> getAllIncidents() async =>
-      List<Incident>.of(incidents);
-
-  @override
-  Future<Incident> addIncident(Incident incident) async {
-    incidents.add(incident);
-    return incident;
-  }
-
-  @override
-  Future<void> updateIncident(Incident incident) async {}
-
-  @override
-  Future<void> deleteIncident(String id) async {
-    incidents.removeWhere((incident) => incident.id == id);
-  }
-}
-
-class FakeEmergencyContactRepository implements EmergencyContactRepository {
-  FakeEmergencyContactRepository([this.contact]);
-  final EmergencyContact? contact;
-
-  @override
-  Future<EmergencyContact?> fetchContact() async => contact;
-
-  @override
-  Future<EmergencyContact> saveContact(EmergencyContactDraft draft) =>
-      throw UnimplementedError();
-}
-
-class FakeAlerts implements AlertGateway {
-  FakeAlerts({this.notificationFailure, this.smsFailure});
-  final String? notificationFailure;
-  final String? smsFailure;
-  final notifications = <String>[];
-  final smsMessages = <String>[];
-
-  @override
-  Future<String?> showEmergencyNotification(String body) async {
-    notifications.add(body);
-    return notificationFailure;
-  }
-
-  @override
-  Future<String?> openSmsComposer({
-    required String phone,
-    required String message,
-  }) async {
-    smsMessages.add(message);
-    return smsFailure;
-  }
-}
-
-const _contact = EmergencyContact(
-  id: 'c1',
-  name: 'Ibu Sari',
-  phoneNumber: '081234567890',
-);
+const _cancelLabel = 'Batalkan (Ini Bukan Darurat)';
 
 Future<IncidentLocation> _gpsOff() async =>
     throw StateError('Layanan lokasi perangkat sedang nonaktif.');
 
-Widget createSubject(
+Future<IncidentLocation> _jakarta() async =>
+    const IncidentLocation(-6.2088, 106.8456);
+
+Widget _subject(
   FakeIncidentRepository repository, {
   FakeAlerts? alerts,
   EmergencyContact? contact,
   Future<IncidentLocation> Function()? location,
+  bool openedFromHome = false,
+  double textScale = 1,
 }) {
-  return ProviderScope(
+  final screen = IncidentScreen(
+    locationProvider: location ?? _gpsOff,
+    alerts: alerts ?? FakeAlerts(),
+  );
+  return testApp(
+    home: openedFromHome ? const _HomeWithButton() : screen,
     overrides: [
       incidentRepositoryProvider.overrideWithValue(repository),
       emergencyContactRepositoryProvider.overrideWithValue(
-        FakeEmergencyContactRepository(contact),
+        FakeEmergencyContactRepository(contact: contact),
       ),
     ],
-    child: MaterialApp(
-      home: IncidentScreen(
-        locationProvider: location ?? _gpsOff,
-        alerts: alerts ?? FakeAlerts(),
-      ),
-      routes: {'/history': (_) => const HistoryScreen()},
-    ),
+    routes: {
+      '/history': (_) => const HistoryScreen(),
+      '/incident': (_) => screen,
+    },
+    textScale: textScale,
   );
 }
 
-Future<void> runCountdown(WidgetTester tester) async {
+class _HomeWithButton extends StatelessWidget {
+  const _HomeWithButton();
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: TextButton(
+          onPressed: () => Navigator.pushNamed(context, '/incident'),
+          child: const Text('Buka insiden'),
+        ),
+      );
+}
+
+Future<void> _runCountdown(WidgetTester tester) async {
   for (var second = 0; second < 10; second++) {
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
@@ -125,11 +73,11 @@ void main() {
     tester,
   ) async {
     final repository = FakeIncidentRepository();
-    await tester.pumpWidget(createSubject(repository));
-    await runCountdown(tester);
+    await tester.pumpWidget(_subject(repository));
+    await _runCountdown(tester);
 
-    expect(repository.incidents, hasLength(1));
-    expect(repository.incidents.single.status, 'sent');
+    expect(repository.stored, hasLength(1));
+    expect(repository.stored.single.status, 'sent');
     expect(find.text('Riwayat Insiden'), findsOneWidget);
   });
 
@@ -138,14 +86,58 @@ void main() {
   ) async {
     final repository = FakeIncidentRepository();
     final alerts = FakeAlerts();
-    await tester.pumpWidget(createSubject(repository, alerts: alerts));
+    await tester.pumpWidget(_subject(repository, alerts: alerts));
 
-    await tester.tap(find.text('Batalkan (Ini Bukan Darurat)'));
+    await tester.tap(find.text(_cancelLabel));
     await tester.pumpAndSettle();
 
-    expect(repository.incidents, hasLength(1));
-    expect(repository.incidents.single.status, 'cancelled');
+    expect(repository.stored.single.status, 'cancelled');
     expect(alerts.smsMessages, isEmpty);
+  });
+
+  testWidgets('the system back button counts as cancelling, not as silence', (
+    tester,
+  ) async {
+    final repository = FakeIncidentRepository();
+    final alerts = FakeAlerts();
+    await tester.pumpWidget(
+      _subject(repository, alerts: alerts, openedFromHome: true),
+    );
+    await tester.tap(find.text('Buka insiden'));
+    await tester.pumpAndSettle();
+
+    await tester.state<NavigatorState>(find.byType(Navigator)).maybePop();
+    await tester.pumpAndSettle();
+
+    expect(repository.stored.single.status, 'cancelled');
+    expect(alerts.smsMessages, isEmpty);
+    expect(find.text('Buka insiden'), findsOneWidget);
+  });
+
+  testWidgets('the cancel button label is readable on its white background', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_subject(FakeIncidentRepository()));
+
+    final labelColor = DefaultTextStyle.of(
+      tester.element(find.text(_cancelLabel)),
+    ).style.color;
+
+    expect(labelColor, AppColors.danger);
+    expect(labelColor, isNot(Colors.white));
+  });
+
+  testWidgets('does not overflow on a short landscape screen with 200% text', (
+    tester,
+  ) async {
+    useScreenSize(tester, const Size(640, 360));
+    await tester.pumpWidget(
+      _subject(FakeIncidentRepository(), textScale: 2),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text(_cancelLabel), findsOneWidget);
   });
 
   testWidgets('failed GPS stores null location, no fake map link, tells user', (
@@ -154,11 +146,11 @@ void main() {
     final repository = FakeIncidentRepository();
     final alerts = FakeAlerts();
     await tester.pumpWidget(
-      createSubject(repository, alerts: alerts, contact: _contact),
+      _subject(repository, alerts: alerts, contact: testContact),
     );
-    await runCountdown(tester);
+    await _runCountdown(tester);
 
-    final saved = repository.incidents.single;
+    final saved = repository.stored.single;
     expect(saved.latitude, isNull);
     expect(saved.longitude, isNull);
     expect(saved.hasLocation, isFalse);
@@ -173,16 +165,16 @@ void main() {
   ) async {
     final repository = FakeIncidentRepository();
     final alerts = FakeAlerts();
-    await tester.pumpWidget(createSubject(
+    await tester.pumpWidget(_subject(
       repository,
       alerts: alerts,
-      contact: _contact,
-      location: () async => const IncidentLocation(-6.2088, 106.8456),
+      contact: testContact,
+      location: _jakarta,
     ));
-    await runCountdown(tester);
+    await _runCountdown(tester);
 
-    expect(repository.incidents.single.latitude, -6.2088);
-    expect(repository.incidents.single.longitude, 106.8456);
+    expect(repository.stored.single.latitude, -6.2088);
+    expect(repository.stored.single.longitude, 106.8456);
     expect(alerts.smsMessages.single,
         contains('https://maps.google.com/?q=-6.2088,106.8456'));
   });
@@ -195,12 +187,25 @@ void main() {
       notificationFailure: 'Izin notifikasi belum diberikan.',
     );
     await tester.pumpWidget(
-      createSubject(repository, alerts: alerts, contact: _contact),
+      _subject(repository, alerts: alerts, contact: testContact),
     );
-    await runCountdown(tester);
+    await _runCountdown(tester);
 
     expect(find.textContaining('Izin notifikasi belum diberikan'),
         findsOneWidget);
     expect(alerts.smsMessages, hasLength(1));
+  });
+
+  testWidgets('a storage failure does not stop the SMS alert', (tester) async {
+    final repository = FakeIncidentRepository(failAdd: true);
+    final alerts = FakeAlerts();
+    await tester.pumpWidget(
+      _subject(repository, alerts: alerts, contact: testContact),
+    );
+    await _runCountdown(tester);
+
+    expect(alerts.smsMessages, hasLength(1));
+    expect(find.textContaining('Riwayat insiden gagal disimpan'),
+        findsOneWidget);
   });
 }

@@ -93,37 +93,37 @@ class IncidentNotifier extends StateNotifier<AsyncValue<List<Incident>>> {
     }
   }
 
-  Future<void> updateStatus(String id, String status) async {
-    final operation = _beginMutation();
-    final previous = state;
-    final incidents = previous.asData?.value;
-    if (incidents == null) return;
-    final updated = incidents
-        .map((incident) =>
-            incident.id == id ? incident.copyWith(status: status) : incident)
-        .toList();
-
-    try {
-      final incident = updated.firstWhere((item) => item.id == id);
-      await _repository.updateIncident(incident);
-      if (operation == _operation) state = AsyncData(updated);
-    } catch (_) {
-      state = AsyncData(List<Incident>.of(incidents));
-      rethrow;
-    }
+  Future<void> updateStatus(String id, String status) {
+    return _mutateExisting((incidents) async {
+      final updated = incidents
+          .map((incident) =>
+              incident.id == id ? incident.copyWith(status: status) : incident)
+          .toList();
+      final target = updated.where((incident) => incident.id == id);
+      if (target.isEmpty) return incidents;
+      await _repository.updateIncident(target.first);
+      return updated;
+    });
   }
 
-  Future<void> deleteIncident(String id) async {
+  Future<void> deleteIncident(String id) {
+    return _mutateExisting((incidents) async {
+      await _repository.deleteIncident(id);
+      return incidents.where((incident) => incident.id != id).toList();
+    });
+  }
+
+  /// Pola bersama untuk ubah/hapus: jalankan [action] pada daftar saat ini,
+  /// pakai hasilnya sebagai state baru, dan pulihkan daftar lama bila gagal.
+  Future<void> _mutateExisting(
+    Future<List<Incident>> Function(List<Incident> current) action,
+  ) async {
     final operation = _beginMutation();
-    final previous = state;
-    final incidents = previous.asData?.value;
+    final incidents = state.asData?.value;
     if (incidents == null) return;
     try {
-      await _repository.deleteIncident(id);
-      if (operation == _operation) {
-        state = AsyncData(
-            incidents.where((incident) => incident.id != id).toList());
-      }
+      final next = await action(incidents);
+      if (operation == _operation) state = AsyncData(next);
     } catch (_) {
       state = AsyncData(List<Incident>.of(incidents));
       rethrow;

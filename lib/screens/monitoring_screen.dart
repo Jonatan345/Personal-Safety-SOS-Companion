@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -9,6 +10,7 @@ import '../services/permission_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_config.dart';
 import '../utils/error_messages.dart';
+import '../utils/snackbars.dart';
 import '../widgets/app_card.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/responsive_body.dart';
@@ -110,21 +112,16 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     final result = await _permissions.requestNotificationPermission();
     final message = result.message;
     if (!_isCurrentAttempt(attempt) || message == null) return;
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 10),
-          showCloseIcon: true,
-          action: result.needsSettings
-              ? SnackBarAction(
-                  label: 'Pengaturan',
-                  onPressed: openAppSettings,
-                )
-              : null,
-        ),
-      );
+    showMessage(
+      messenger,
+      message,
+      duration: const Duration(seconds: 10),
+      dismissible: true,
+      replace: true,
+      action: result.needsSettings
+          ? SnackBarAction(label: 'Pengaturan', onPressed: openAppSettings)
+          : null,
+    );
   }
 
   Future<void> _disposeMonitoring() async {
@@ -191,9 +188,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   }
 
   void _stop() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Monitoring dihentikan')),
-    );
+    showMessage(ScaffoldMessenger.of(context), 'Monitoring dihentikan');
     Navigator.pop(context);
   }
 
@@ -297,13 +292,16 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
     final actions = Column(
       children: [
-        PrimaryButton(
-          label: 'Simulasikan Shake/Fall',
-          icon: Icons.warning_amber_rounded,
-          color: AppColors.danger,
-          onPressed: () => _monitoring?.simulateMotion(),
-        ),
-        const SizedBox(height: 10),
+        // Tombol uji hanya untuk build debug/profile; build rilis memakai sensor.
+        if (!kReleaseMode) ...[
+          PrimaryButton(
+            label: 'Simulasikan Shake/Fall',
+            icon: Icons.warning_amber_rounded,
+            color: AppColors.danger,
+            onPressed: () => _monitoring?.simulateMotion(),
+          ),
+          const SizedBox(height: 10),
+        ],
         PrimaryButton(
           label: 'Hentikan Monitoring',
           color: AppColors.textSecondary,
