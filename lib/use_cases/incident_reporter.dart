@@ -2,6 +2,7 @@ import '../models/emergency_contact.dart';
 import '../models/incident.dart';
 import '../models/incident_status.dart';
 import '../services/alert_service.dart';
+import '../services/app_logger.dart';
 import '../services/location_service.dart';
 import '../utils/sos_message.dart';
 
@@ -55,6 +56,7 @@ class IncidentReporter {
 
   Future<IncidentReport> report(String status) async {
     final isSent = status == IncidentStatus.sent;
+    AppLogger.instance.info('incident', 'Insiden diproses: status=$status');
     // Waktu insiden dicatat sebelum menunggu GPS (yang bisa sampai belasan detik).
     final occurredAt = _clock();
     final location = isSent ? await _tryLocate() : const _Located();
@@ -76,6 +78,10 @@ class IncidentReporter {
     }
 
     final contact = await _tryLoadContact();
+    AppLogger.instance.info(
+      'incident',
+      'Insiden terkirim: lokasi=${incident.hasLocation}, kontak=${contact.contact != null}',
+    );
     return IncidentReport(
       incident: incident,
       contact: contact.contact,
@@ -106,7 +112,10 @@ class IncidentReporter {
           ? 'Insiden tersimpan. Atur kontak untuk mengirim SMS.'
           : 'Alert siap dikirim ke ${contact.name}.',
     );
-    if (notificationFailure != null) notes.add(notificationFailure);
+    if (notificationFailure != null) {
+      AppLogger.instance.warning('alert', notificationFailure);
+      notes.add(notificationFailure);
+    }
     if (notes.isNotEmpty) onNotes(notes);
 
     if (contact == null) return;
@@ -114,7 +123,10 @@ class IncidentReporter {
       phone: contact.phoneNumber,
       message: report.message,
     );
-    if (smsFailure != null) onNotes([smsFailure]);
+    if (smsFailure != null) {
+      AppLogger.instance.warning('alert', smsFailure);
+      onNotes([smsFailure]);
+    }
   }
 
   Future<_Located> _tryLocate() async {
@@ -125,6 +137,7 @@ class IncidentReporter {
         longitude: position.longitude,
       );
     } catch (error) {
+      AppLogger.instance.warning('incident', 'Lokasi gagal diambil', error);
       return _Located(failure: locationFailureMessage(error));
     }
   }
@@ -133,8 +146,9 @@ class IncidentReporter {
     try {
       await _save(incident);
       return null;
-    } catch (_) {
+    } catch (error) {
       // Gagal menyimpan riwayat tidak boleh menghentikan alert darurat.
+      AppLogger.instance.error('incident', 'Riwayat insiden gagal disimpan', error);
       return 'Riwayat insiden gagal disimpan.';
     }
   }
@@ -142,7 +156,8 @@ class IncidentReporter {
   Future<_ContactLoad> _tryLoadContact() async {
     try {
       return _ContactLoad(contact: await _loadContact());
-    } catch (_) {
+    } catch (error) {
+      AppLogger.instance.error('incident', 'Kontak darurat gagal dimuat', error);
       return const _ContactLoad(failure: 'Kontak darurat tidak dapat dimuat.');
     }
   }

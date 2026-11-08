@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/incident.dart';
 import '../repositories/incident_repository.dart';
+import '../services/app_logger.dart';
 import '../services/incident_api.dart';
 import '../utils/error_messages.dart';
 
@@ -61,6 +62,7 @@ class IncidentNotifier extends StateNotifier<AsyncValue<List<Incident>>> {
       _emit(const IncidentSyncState.idle());
     } catch (error) {
       if (operation != _operation) return;
+      AppLogger.instance.warning('sync', 'Sinkronisasi dengan server gagal', error);
       _emit(IncidentSyncState.failed(userMessageFor(error)));
     }
   }

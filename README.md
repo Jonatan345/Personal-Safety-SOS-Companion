@@ -62,6 +62,10 @@ node --test backend/server.test.mjs
 Penjelasan test, kontrak perilaku, dan refactor: `docs/p9-test-refactor.md`.
 Bug yang ditemukan dan test regresinya: `docs/bug-log.md`.
 
+## Log aplikasi dan rilis
+- Beranda → ikon serangga membuka **Log Aplikasi** (salin atau hapus). Log mencatat start aplikasi, sensor, insiden, sinkronisasi, dan error yang tidak tertangani, dan tetap ada setelah aplikasi ditutup.
+- Cara membuat APK rilis bertanda tangan: `docs/p10-release.md`. Catatan rilis: `RELEASE_NOTES.md`.
+
 ## Dokumentasi
 - `ARCHITECTURE.md`: struktur, lapisan, alur, data
 - `docs/scope.md`: batas fitur

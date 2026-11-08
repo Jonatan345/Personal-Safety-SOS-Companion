@@ -10,6 +10,7 @@ class LocalStorageService {
   // Satu-satunya tempat nama box didefinisikan.
   static const contactsBox = 'emergency_contacts_v2';
   static const incidentsBox = 'incidents_v2';
+  static const logsBox = 'app_logs_v1';
 
   static Future<void>? _ready;
 
@@ -30,6 +31,9 @@ class LocalStorageService {
     }
     if (!Hive.isBoxOpen(incidentsBox)) {
       await Hive.openBox<String>(incidentsBox);
+    }
+    if (!Hive.isBoxOpen(logsBox)) {
+      await Hive.openBox<String>(logsBox);
     }
   }
 }

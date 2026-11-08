@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../routes/app_routes.dart';
+import '../services/app_logger.dart';
 import '../services/monitoring_service.dart';
 import '../services/permission_service.dart';
 import '../theme/app_theme.dart';
@@ -92,6 +93,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       startingSensors = true;
       await service.start().timeout(_sensorStartTimeout);
       if (_isCurrentAttempt(attempt)) {
+        AppLogger.instance.info('monitoring', 'Sensor aktif');
         setState(() => _loading = false);
       }
     } catch (error) {
@@ -143,6 +145,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
   void _showFailure(int attempt, String message) {
     if (!_isCurrentAttempt(attempt)) return;
+    AppLogger.instance.error('monitoring', message);
     setState(() {
       _loading = false;
       _error = message;
@@ -177,6 +180,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       return;
     }
     _triggerHandled = true;
+    AppLogger.instance.info('monitoring', 'Pemicu terdeteksi: ${source.name}');
     try {
       await Navigator.pushNamed(context, AppRoutes.incident,
           arguments: source.name);

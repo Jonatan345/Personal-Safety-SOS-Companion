@@ -1,32 +1,55 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'routes/app_routes.dart';
 import 'services/alert_service.dart';
+import 'services/app_logger.dart';
 import 'services/local_storage_service.dart';
 import 'theme/app_theme.dart';
+import 'utils/app_info.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _installErrorLogging();
+  AppLogger.instance.info('app', 'Aplikasi dimulai (versi ${AppInfo.label})');
   runApp(const ProviderScope(child: SosCompanionApp()));
-
-  // No platform/storage work may block the first Flutter frame. Android keeps
-  // the launch splash on screen until that first frame has been rendered.
   unawaited(_warmUpDeviceServices());
 }
 
+/// Semua error Flutter dan error async yang tidak tertangani masuk ke log.
+void _installErrorLogging() {
+  FlutterError.onError = (details) {
+    AppLogger.instance.error(
+      'flutter',
+      details.exceptionAsString(),
+      null,
+      details.stack,
+    );
+    FlutterError.presentError(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLogger.instance.error('platform', 'Error tidak tertangani', error, stack);
+    return true;
+  };
+}
+
+/// Starts after the first frame so storage and platform setup cannot keep the
+/// app on a blank splash screen. Repositories wait on [LocalStorageService]
+/// before reading boxes.
 Future<void> _warmUpDeviceServices() async {
   try {
     await LocalStorageService.ensureReady();
-  } catch (_) {
-    // Individual data screens already expose an error state and retry path.
+    await AppLogger.instance.enablePersistence();
+  } catch (error, stack) {
+    AppLogger.instance.error('app', 'Penyimpanan lokal gagal disiapkan', error, stack);
   }
   try {
     await AlertService.instance.initialise();
-  } catch (_) {
-    // Notifications are optional for opening the app.
+  } catch (error, stack) {
+    AppLogger.instance.error('app', 'Notifikasi gagal disiapkan', error, stack);
   }
 }
 
@@ -44,4 +67,3 @@ class SosCompanionApp extends StatelessWidget {
     );
   }
 }
-

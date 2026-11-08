@@ -14,7 +14,16 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('SOS Companion')),
+      appBar: AppBar(
+        title: const Text('SOS Companion'),
+        actions: [
+          IconButton(
+            tooltip: 'Log aplikasi',
+            icon: const Icon(Icons.bug_report_outlined),
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.logs),
+          ),
+        ],
+      ),
       body: ResponsiveBody(
         builder: (context, wide) {
           final status = _ReadinessCard(

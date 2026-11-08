@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 
 import '../models/incident.dart';
+import '../services/app_logger.dart';
 import '../services/incident_api.dart';
 import '../services/local_storage_service.dart';
 
@@ -30,7 +30,7 @@ class IncidentRepository {
         }
       } on FormatException catch (error) {
         // Satu catatan rusak tidak boleh menggagalkan seluruh riwayat.
-        debugPrint('Melewati catatan insiden rusak: $error');
+        AppLogger.instance.warning('data', 'Melewati catatan insiden rusak', error);
       }
     }
     incidents.sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -72,6 +72,10 @@ class IncidentRepository {
     final local = await getAllIncidents();
     await _pullMissing(remote, local);
     await _pushDifferences(api, remote, local);
+    AppLogger.instance.info(
+      'sync',
+      'Sinkronisasi selesai: ${remote.length} di server, ${local.length} di perangkat',
+    );
     return getAllIncidents();
   }
 
@@ -99,7 +103,7 @@ class IncidentRepository {
         }
       }
     } on IncidentApiException catch (error) {
-      debugPrint('Gagal mengunggah perubahan insiden: $error');
+      AppLogger.instance.warning('sync', 'Gagal mengunggah perubahan insiden', error);
     }
   }
 
@@ -118,7 +122,7 @@ class IncidentRepository {
     try {
       await call(api);
     } catch (error) {
-      debugPrint('Sinkronisasi ($action) gagal: $error');
+      AppLogger.instance.warning('sync', 'Sinkronisasi ($action) gagal', error);
     }
   }
 }

@@ -1,7 +1,19 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Kunci rilis dibaca dari android/key.properties (tidak masuk Git). Lihat
+// docs/p10-release.md untuk cara membuatnya.
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasReleaseKey = keystorePropertiesFile.exists()
+if (hasReleaseKey) {
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
 }
 
 android {
@@ -30,17 +42,35 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             // R8 removes unused code/resources and obfuscates the Java/Kotlin
-            // portion of the app. Configure a dedicated upload keystore before
-            // distributing a release; never publish an APK signed with debug keys.
+            // portion of the app.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // Tanpa key.properties APK tetap bisa dipasang untuk uji lokal
+            // (kunci debug), tetapi TIDAK boleh dipublikasikan.
+            signingConfig = if (hasReleaseKey) {
+                signingConfigs.getByName("release")
+            } else {
+                println("PERINGATAN: android/key.properties tidak ditemukan. APK rilis memakai kunci debug (hanya uji lokal).")
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
