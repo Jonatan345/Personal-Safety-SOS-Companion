@@ -23,3 +23,21 @@ Versi: `1.0.0+1` · tag: `v1.0.0-rc.1` · platform: Android (APK)
 - Backend sinkronisasi hanya demo (tanpa autentikasi, HTTP hanya pada build debug).
 - Penghapusan yang gagal dikirim ke server dapat muncul kembali saat sinkronisasi.
 - `applicationId` masih `com.example.sos_companion`: harus diganti sebelum publikasi ke Play Store.
+
+## Hasil User Test (RC1)
+
+Penguji: 3 reviewer, semuanya memakai satu perangkat (HP pengembang).
+
+| Penguji | Tugas utama | Kemudahan (1–5) | Temuan |
+| --- | --- | --- | --- |
+| Reviewer 1 | Berhasil tanpa bantuan | 5 | Tidak ada yang membingungkan; semua menu ada di satu halaman |
+| Reviewer 2 | Berhasil tanpa bantuan | 5 | Alur jelas, sederhana, mudah dipahami pengguna baru |
+| Reviewer 3 | Berhasil tanpa bantuan | 5 | Tidak ada yang membingungkan |
+
+Ringkasan: 3 dari 3 penguji menyelesaikan alur utama tanpa bantuan; rata-rata
+kemudahan 5,0. Tidak ditemukan bug kritis pada pengujian ini.
+
+Keterbatasan: pengujian hanya pada satu perangkat, sehingga kompatibilitas di
+merek dan versi Android lain belum teruji.
+
+**Keputusan: GO** untuk rilis RC1 ke tahap pengujian berikutnya.
