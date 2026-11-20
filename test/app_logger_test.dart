@@ -15,7 +15,26 @@ void main() {
       LogLevel.error,
     ]);
     expect(logger.entries.last.message, contains('gagal simpan'));
-    expect(logger.entries.last.message, contains('disk penuh'));
+    expect(logger.entries.last.message, contains('[status: StateError]'));
+    expect(logger.entries.last.message, isNot(contains('disk penuh')));
+  });
+
+  test('does not record incident JSON or location from an exception', () {
+    final logger = AppLogger();
+    const privatePayload =
+        '{"latitude":-6.2088,"longitude":106.8456,"timestamp":"2026"}';
+
+    logger.warning(
+      'data',
+      'Melewati catatan insiden rusak',
+      const FormatException(privatePayload),
+    );
+
+    final message = logger.entries.single.message;
+    expect(message, 'Melewati catatan insiden rusak [status: FormatException]');
+    expect(message, isNot(contains('latitude')));
+    expect(message, isNot(contains('longitude')));
+    expect(logger.exportText(), isNot(contains(privatePayload)));
   });
 
   test('keeps only the newest entries when the limit is reached', () {

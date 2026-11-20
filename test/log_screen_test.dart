@@ -40,7 +40,8 @@ void main() {
     expect(find.textContaining('muncul belakangan'), findsOneWidget);
   });
 
-  testWidgets('copy puts the full log on the clipboard', (tester) async {
+  testWidgets('copy asks for confirmation before putting the log on clipboard',
+      (tester) async {
     String? copied;
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       SystemChannels.platform,
@@ -57,6 +58,12 @@ void main() {
     await tester.pumpWidget(_subject(logger));
 
     await tester.tap(find.byTooltip('Salin log'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Salin log aplikasi?'), findsOneWidget);
+    expect(copied, isNull);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Salin log'));
     await tester.pumpAndSettle();
 
     expect(copied, contains('gagal simpan'));

@@ -90,14 +90,13 @@ class AppLogger {
     String tag,
     String message,
     Object? error,
-    StackTrace? stack,
+    StackTrace? _,
   ) {
+    // Pesan exception dan stack trace dapat berisi payload yang sedang
+    // diproses, misalnya JSON insiden dengan koordinat. Simpan hanya jenis
+    // kegagalannya agar log tetap berguna tanpa menyalin data pengguna.
     final details = StringBuffer(message);
-    if (error != null) details.write(' | $error');
-    if (stack != null) {
-      final lines = stack.toString().trim().split('\n').take(4);
-      details.write('\n${lines.join('\n')}');
-    }
+    if (error != null) details.write(' [status: ${error.runtimeType}]');
     final entry = LogEntry(
       time: DateTime.now(),
       level: level,
@@ -136,8 +135,8 @@ class AppLogger {
       }
       _box = box;
       changes.value++;
-    } catch (error) {
-      debugPrint('Log tidak dapat disimpan permanen: $error');
+    } catch (_) {
+      debugPrint('Log tidak dapat disimpan permanen.');
     }
   }
 

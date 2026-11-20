@@ -25,6 +25,30 @@ class LogScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _confirmCopy(BuildContext context) async {
+    final shouldCopy = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Salin log aplikasi?'),
+        content: const Text(
+          'Log akan masuk ke clipboard. Tinjau isinya sebelum membagikannya '
+          'kepada pengembang.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Salin log'),
+          ),
+        ],
+      ),
+    );
+    if (shouldCopy == true && context.mounted) await _copy(context);
+  }
+
   Future<void> _clear(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     await logger.clear();
@@ -44,7 +68,8 @@ class LogScreen extends StatelessWidget {
               IconButton(
                 tooltip: 'Salin log',
                 icon: const Icon(Icons.copy_outlined),
-                onPressed: entries.isEmpty ? null : () => _copy(context),
+                onPressed:
+                    entries.isEmpty ? null : () => _confirmCopy(context),
               ),
               IconButton(
                 tooltip: 'Hapus log',
