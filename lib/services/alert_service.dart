@@ -80,7 +80,7 @@ class AlertService implements AlertGateway {
     }
   }
 
-  Uri createSmsUri({
+  static Uri createSmsUri({
     required String phone,
     required String message,
   }) {
@@ -108,6 +108,5 @@ class AlertService implements AlertGateway {
     } catch (_) {
       return 'Aplikasi SMS tidak dapat dibuka. Hubungi kontak darurat manual.';
     }
-  }
-  return null;
+  }  
 }

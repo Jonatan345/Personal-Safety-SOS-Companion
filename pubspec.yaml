@@ -20,6 +20,7 @@ dependencies:
   noise_meter: ^5.0.1
   flutter_local_notifications: ^18.0.1
   url_launcher: ^6.3.1
+  flutter_foreground_task: ^11.0.3
 
 dev_dependencies:
   flutter_test:

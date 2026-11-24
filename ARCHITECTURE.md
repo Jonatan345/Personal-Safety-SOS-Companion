@@ -52,25 +52,30 @@ Screen (UI)  ->  Notifier (state)  ->  Use case / Repository  ->  Hive / REST
 
 Layar tidak menyentuh Hive secara langsung. Layanan yang memakai platform
 berada di balik antarmuka kecil (`MonitoringController`, `AlertGateway`,
-`EmergencyContactRepository`) sehingga test bisa menggantinya.
+`ForegroundTaskGateway`, `EmergencyContactRepository`) sehingga test bisa menggantinya.
 
 ## Alur runtime
 1. **Monitoring** meminta izin mikrofon (satu-satunya prasyarat), lalu memulai
-   accelerometer (≥ `SosConfig.accelerationThreshold`) dan mikrofon
-   (≥ `SosConfig.soundThresholdDb`). Izin notifikasi diminta tanpa memblokir.
+   accelerometer (≥ `SosConfig.accelerationThreshold`), mikrofon
+   (≥ `SosConfig.soundThresholdDb`), serta memulai foreground service
+   Android (`flutter_foreground_task`) dengan notifikasi permanen dan tombol
+   "Hentikan". Izin notifikasi diminta tanpa memblokir.
    Izin dan start sensor punya batas waktu dan tombol coba lagi.
-2. Trigger membuka layar **Insiden**: hitung mundur `SosConfig.countdownSeconds`.
-   Batal lewat tombol atau tombol kembali sistem dicatat sebagai `cancelled`.
-3. Saat hitung mundur selesai, `IncidentReporter.report('sent')`: waktu dicatat,
-   GPS dibaca (gagal → lokasi `null`), insiden disimpan, kontak dimuat.
+2. Pemicu dapat berupa sensor otomatis (guncangan/suara) saat monitoring aktif,
+   atau tombol tekan-tahan **SOS Manual** di Beranda. Trigger membuka layar
+   **Insiden**: hitung mundur `SosConfig.countdownSeconds` (atau 3 detik untuk
+   manual). Batal lewat tombol atau tombol kembali sistem dicatat sebagai `cancelled`.
+3. Saat hitung mundur selesai, `IncidentReporter.report('sent', source: ...)`:
+   waktu dicatat, GPS dibaca (gagal → lokasi `null`), insiden disimpan beserta
+   sumber pemicu, kontak dimuat.
 4. App membuka **Riwayat**; `IncidentReporter.dispatch` menampilkan notifikasi
-   lalu membuka SMS composer (tautan peta hanya jika lokasi ada). Setiap
-   kegagalan tampil sebagai pesan Bahasa Indonesia.
+   lalu membuka SMS composer (tautan peta hanya jika lokasi ada; spasi dikodekan
+   sebagai %20 tanpa tanda +). Setiap kegagalan tampil sebagai pesan Bahasa Indonesia.
 5. Setelah layar insiden ditutup, monitoring tetap bekerja.
 
 ## Data
 - `Incident`: id, timestamp, latitude/longitude nullable, status
-  (`IncidentStatus`). Box `incidents_v2`.
+  (`IncidentStatus`), source (`manual`, `motion`, `sound`). Box `incidents_v2`.
 - `EmergencyContact`: id, name, phoneNumber. Box `emergency_contacts_v2`.
 - Sinkronisasi (opsional, `--dart-define=API_BASE_URL=...`): Riwayat memuat data
   lokal dulu, lalu `syncFromServer` menggabungkan dengan backend. Perangkat
@@ -81,7 +86,6 @@ berada di balik antarmuka kecil (`MonitoringController`, `AlertGateway`,
 `LocalStorageService` (nama box), `AppRoutes` (nama rute).
 
 ## Batasan
-- Monitoring hanya berjalan saat aplikasi terbuka di layar.
 - SMS composer memerlukan pengguna menekan kirim.
 - Build rilis memblokir HTTP; build debug mengizinkannya untuk backend lokal.
 - Penghapusan yang gagal dikirim ke server dapat muncul kembali saat sinkronisasi.

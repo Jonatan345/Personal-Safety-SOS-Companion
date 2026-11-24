@@ -196,7 +196,7 @@ class IncidentReporter {
     }
   }
 
-  Future<_ContactLoad> tryLoadContacts() async {
+  Future<_ContactLoad> _tryLoadContacts() async {
     try {
       if (_loadContacts != null) {
         final list = await _loadContacts();
