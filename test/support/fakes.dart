@@ -45,6 +45,7 @@ class FakeIncidentRepository extends IncidentRepository {
     this.failAdd = false,
     this.failMutations = false,
     this.firstReadGate,
+    this.saveGate,
     this.onSync,
   }) : stored = List<Incident>.of(initial);
 
@@ -53,6 +54,7 @@ class FakeIncidentRepository extends IncidentRepository {
   final bool failAdd;
   final bool failMutations;
   final Completer<void>? firstReadGate;
+  final Completer<void>? saveGate;
   final Future<List<Incident>> Function()? onSync;
   final List<Incident> updated = [];
   int loads = 0;
@@ -74,6 +76,7 @@ class FakeIncidentRepository extends IncidentRepository {
   @override
   Future<Incident> addIncident(Incident incident) async {
     if (failAdd) throw StateError('disk penuh');
+    if (saveGate != null) await saveGate!.future;
     stored.add(incident);
     return incident;
   }
@@ -96,26 +99,93 @@ class FakeIncidentRepository extends IncidentRepository {
 /// Repository kontak darurat. [saveCalls] menghitung berapa kali API disimpan
 /// dipanggil (untuk memastikan validasi dan tap ganda tidak membocor ke API).
 class FakeEmergencyContactRepository implements EmergencyContactRepository {
-  FakeEmergencyContactRepository({this.contact, this.onFetch, this.onSave});
+  FakeEmergencyContactRepository({
+    this.contact,
+    List<EmergencyContact>? contacts,
+    this.onFetch,
+    this.onSave,
+  }) : _contacts = contacts != null
+            ? List<EmergencyContact>.of(contacts)
+            : (contact != null ? [contact] : <EmergencyContact>[]);
 
   final EmergencyContact? contact;
+  final List<EmergencyContact> _contacts;
   final Future<EmergencyContact?> Function()? onFetch;
   final Future<EmergencyContact> Function(EmergencyContactDraft draft)? onSave;
   int saveCalls = 0;
 
   @override
-  Future<EmergencyContact?> fetchContact() =>
-      onFetch?.call() ?? Future.value(contact);
+  Future<EmergencyContact?> fetchContact() {
+    if (onFetch != null) return onFetch!();
+    return Future.value(_contacts.isEmpty ? null : _contacts.first);
+  }
 
   @override
-  Future<EmergencyContact> saveContact(EmergencyContactDraft draft) {
+  Future<List<EmergencyContact>> fetchContacts() async {
+    if (onFetch != null) {
+      final single = await onFetch!();
+      return single != null ? [single] : [];
+    }
+    return List<EmergencyContact>.of(_contacts);
+  }
+
+  @override
+  Future<EmergencyContact> saveContact(EmergencyContactDraft draft) =>
+      _save(draft, id: '1', replaceAll: true);
+
+  Future<EmergencyContact> _save(
+    EmergencyContactDraft draft, {
+    required String id,
+    required bool replaceAll,
+  }) async {
     saveCalls++;
-    return onSave?.call(draft) ??
-        Future.value(EmergencyContact(
-          id: '1',
-          name: draft.name,
-          phoneNumber: draft.phoneNumber,
-        ));
+    final created = onSave != null
+        ? await onSave!(draft)
+        : EmergencyContact(
+            id: id, name: draft.name, phoneNumber: draft.phoneNumber);
+    if (replaceAll) _contacts.clear();
+    _contacts.removeWhere((contact) => contact.id == created.id);
+    _contacts.add(created);
+    return created;
+  }
+
+  @override
+  Future<List<EmergencyContact>> saveContacts(
+      List<EmergencyContact> contacts) async {
+    _contacts.clear();
+    _contacts.addAll(contacts);
+    return List<EmergencyContact>.of(_contacts);
+  }
+
+  @override
+  Future<EmergencyContact> addContact(EmergencyContactDraft draft) async {
+    return _save(
+      draft,
+      id: (_contacts.length + 1).toString(),
+      replaceAll: false,
+    );
+  }
+
+  @override
+  Future<EmergencyContact> updateContact(EmergencyContact contact) async {
+    return _save(
+      EmergencyContactDraft(
+          name: contact.name, phoneNumber: contact.phoneNumber),
+      id: contact.id,
+      replaceAll: false,
+    );
+  }
+
+  @override
+  Future<void> deleteContact(String id) async {
+    _contacts.removeWhere((c) => c.id == id);
+  }
+
+  @override
+  Future<void> reorderContacts(int oldIndex, int newIndex) async {
+    if (oldIndex < newIndex) newIndex -= 1;
+    final item = _contacts.removeAt(oldIndex);
+    _contacts.insert(newIndex, item);
   }
 }
 
@@ -127,13 +197,19 @@ class FakeAlerts implements AlertGateway {
   final String? smsFailure;
   final events = <String>[];
   final notifications = <String>[];
+  final notificationIds = <int?>[];
   final smsMessages = <String>[];
   final smsPhones = <String>[];
 
   @override
-  Future<String?> showEmergencyNotification(String body) async {
+  Future<String?> showEmergencyNotification(
+    String body, {
+    int? id,
+    String? title,
+  }) async {
     events.add('notification');
     notifications.add(body);
+    notificationIds.add(id);
     return notificationFailure;
   }
 

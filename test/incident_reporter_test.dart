@@ -3,6 +3,7 @@ import 'package:sos_companion/models/emergency_contact.dart';
 import 'package:sos_companion/models/incident.dart';
 import 'package:sos_companion/services/location_service.dart';
 import 'package:sos_companion/use_cases/incident_reporter.dart';
+import 'package:sos_companion/utils/formatters.dart';
 
 import 'support/fakes.dart';
 
@@ -13,6 +14,7 @@ class _Harness {
     this.locate,
     this.saveFails = false,
     this.contact = testContact,
+    this.contacts,
     this.contactFails = false,
     FakeAlerts? alerts,
     DateTime Function()? clock,
@@ -22,6 +24,7 @@ class _Harness {
   final Future<IncidentLocation> Function()? locate;
   final bool saveFails;
   final EmergencyContact? contact;
+  final List<EmergencyContact>? contacts;
   final bool contactFails;
   final FakeAlerts alerts;
   final DateTime Function() _clock;
@@ -38,10 +41,10 @@ class _Harness {
           if (saveFails) throw StateError('disk penuh');
           saved.add(incident);
         },
-        loadContact: () async {
+        loadContacts: () async {
           contactLoads++;
           if (contactFails) throw StateError('gagal membaca');
-          return contact;
+          return contacts ?? (contact != null ? [contact!] : []);
         },
         alerts: alerts,
         clock: _clock,
@@ -97,8 +100,10 @@ void main() {
       expect(report.message, contains('tidak tersedia'));
       expect(
         report.notes,
-        ['Layanan lokasi perangkat sedang nonaktif. '
-            'Alert tetap dikirim tanpa lokasi.'],
+        [
+          'Layanan lokasi perangkat sedang nonaktif. '
+              'Alert tetap dikirim tanpa lokasi.'
+        ],
       );
     });
 
@@ -141,8 +146,8 @@ void main() {
       final report = await harness.reporter.report('sent');
 
       expect(report.contact, isNull);
-      expect(report.notes,
-          ['Kontak darurat belum diatur, SMS tidak disiapkan.']);
+      expect(
+          report.notes, ['Kontak darurat belum diatur, SMS tidak disiapkan.']);
     });
 
     test('a contact that cannot be loaded gets its own message', () async {
@@ -151,6 +156,32 @@ void main() {
       final report = await harness.reporter.report('sent');
 
       expect(report.notes, ['Kontak darurat tidak dapat dimuat.']);
+    });
+
+    test(
+        'uses last known location as fallback with estimated label in SMS and notes (Feature #13)',
+        () async {
+      final harness = _Harness(
+        locate: () async => IncidentLocation(
+          -6.2088,
+          106.8456,
+          isEstimated: true,
+          recordedAt: DateTime.now().subtract(const Duration(minutes: 4)),
+        ),
+      );
+
+      final report = await harness.reporter.report('sent');
+
+      expect(report.incident.isEstimatedLocation, isTrue);
+      expect(
+          report.incident.locationLabel, contains('perkiraan ± 4 menit lalu'));
+      expect(report.message, contains('(perkiraan ± 4 menit lalu)'));
+      expect(report.message,
+          contains('https://maps.google.com/?q=-6.2088,106.8456'));
+      expect(
+        report.notes,
+        contains(contains('Menggunakan lokasi perkiraan terakhir')),
+      );
     });
   });
 
@@ -166,6 +197,42 @@ void main() {
       expect(harness.alerts.smsPhones.single, '081234567890');
       expect(harness.alerts.smsMessages.single, report.message);
       expect(batches, isEmpty);
+    });
+
+    test(
+        'supports multiple emergency contacts in SMS composer and notification (Feature #11)',
+        () async {
+      const contact2 = EmergencyContact(
+        id: '2',
+        name: 'Pak Budi',
+        phoneNumber: '081234567891',
+      );
+      final harness = _Harness(contacts: [testContact, contact2]);
+      final report = await harness.reporter.report('sent');
+
+      expect(report.contacts, [testContact, contact2]);
+
+      final batches = <List<String>>[];
+      await harness.reporter.dispatch(report, batches.add);
+
+      expect(harness.alerts.smsPhones.single, '081234567890,081234567891');
+      expect(harness.alerts.notifications.single, contains('2 kontak'));
+      expect(harness.alerts.notifications.single, contains('Ibu Sari'));
+    });
+
+    test('notification uses unique incident id and includes timestamp (Bug #9)',
+        () async {
+      final harness = _Harness();
+      final report = await harness.reporter.report('sent');
+
+      await harness.reporter.dispatch(report, (_) {});
+
+      expect(harness.alerts.notificationIds.single, isNotNull);
+      expect(harness.alerts.notificationIds.single, isNonZero);
+      expect(
+        harness.alerts.notifications.single,
+        contains(formatClock(_startTime)),
+      );
     });
 
     test('reports a notification failure before the SMS is opened', () async {

@@ -226,4 +226,26 @@ void main() {
     );
     handle.dispose();
   });
+
+  testWidgets('menampilkan sumber pemicu manual di riwayat dan detail sheet (Feature #12)',
+      (tester) async {
+    final manualIncident = buildLocatedIncident(
+      id: 'manual-1',
+    ).copyWith(source: 'manual');
+
+    await tester.pumpWidget(
+      _subject(FakeIncidentRepository(initial: [manualIncident])),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('$_coordinates • Manual'), findsOneWidget);
+
+    // Buka detail sheet
+    await tester.tap(find.text('$_coordinates • Manual'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detail Insiden'), findsOneWidget);
+    expect(find.text('Pemicu'), findsOneWidget);
+    expect(find.text('Manual'), findsOneWidget);
+  });
 }

@@ -23,7 +23,8 @@ class IncidentTile extends StatelessWidget {
     return AppCard(
       onTap: onTap,
       semanticLabel: 'Insiden ${formatDateTimeSpoken(item.timestamp)}, '
-          'status ${statusLabel.toLowerCase()}, ${item.locationLabel}',
+          'status ${statusLabel.toLowerCase()}, ${item.locationLabel}'
+          '${item.sourceLabel != null ? ', pemicu ${item.sourceLabel!.toLowerCase()}' : ''}',
       semanticHint: 'Ketuk untuk melihat detail dan tindakan',
       child: Row(
         children: [
@@ -50,7 +51,9 @@ class IncidentTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.locationLabel,
+                  item.sourceLabel != null
+                      ? '${item.locationLabel} • ${item.sourceLabel}'
+                      : item.locationLabel,
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,

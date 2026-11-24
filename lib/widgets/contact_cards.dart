@@ -77,33 +77,152 @@ class LoadedContactCard extends StatelessWidget {
   const LoadedContactCard({
     super.key,
     required this.contact,
+    this.contacts = const [],
     required this.onEdit,
+    this.onDelete,
+    this.onMoveUp,
+    this.onMoveDown,
+    this.onAddMore,
   });
 
   final EmergencyContact contact;
-  final VoidCallback onEdit;
+  final List<EmergencyContact> contacts;
+  final void Function(EmergencyContact contact) onEdit;
+  final void Function(EmergencyContact contact)? onDelete;
+  final void Function(int index)? onMoveUp;
+  final void Function(int index)? onMoveDown;
+  final VoidCallback? onAddMore;
 
   @override
   Widget build(BuildContext context) {
+    final list = contacts.isNotEmpty ? contacts : [contact];
+
     return AppCard(
       key: const Key('contact-data-state'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Kontak darurat aktif',
-              style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 14),
-          _InfoRow(icon: Icons.person_outline, text: contact.name),
-          const SizedBox(height: 8),
-          _InfoRow(icon: Icons.phone_outlined, text: contact.phoneNumber),
-          const SizedBox(height: 18),
-          OutlinedButton.icon(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Ubah Kontak'),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Kontak darurat aktif',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (list.length < 5 && onAddMore != null)
+                TextButton.icon(
+                  onPressed: onAddMore,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Tambah Kontak'),
+                ),
+            ],
           ),
+          const SizedBox(height: 14),
+          for (var i = 0; i < list.length; i++) ...[
+            if (i > 0) const Divider(height: 24),
+            _ContactItemRow(
+              index: i,
+              total: list.length,
+              contact: list[i],
+              onEdit: () => onEdit(list[i]),
+              onDelete: onDelete != null ? () => onDelete!(list[i]) : null,
+              onMoveUp: onMoveUp != null && i > 0 ? () => onMoveUp!(i) : null,
+              onMoveDown: onMoveDown != null && i < list.length - 1
+                  ? () => onMoveDown!(i)
+                  : null,
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _ContactItemRow extends StatelessWidget {
+  const _ContactItemRow({
+    required this.index,
+    required this.total,
+    required this.contact,
+    required this.onEdit,
+    this.onDelete,
+    this.onMoveUp,
+    this.onMoveDown,
+  });
+
+  final int index;
+  final int total;
+  final EmergencyContact contact;
+  final VoidCallback onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (total > 1) ...[
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Prioritas #${index + 1}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (onMoveUp != null)
+                IconButton(
+                  icon: const Icon(Icons.arrow_upward, size: 18),
+                  tooltip: 'Pindahkan ke atas',
+                  onPressed: onMoveUp,
+                  visualDensity: VisualDensity.compact,
+                ),
+              if (onMoveDown != null)
+                IconButton(
+                  icon: const Icon(Icons.arrow_downward, size: 18),
+                  tooltip: 'Pindahkan ke bawah',
+                  onPressed: onMoveDown,
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+        _InfoRow(icon: Icons.person_outline, text: contact.name),
+        const SizedBox(height: 8),
+        _InfoRow(icon: Icons.phone_outlined, text: contact.phoneNumber),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Ubah Kontak'),
+            ),
+            if (onDelete != null)
+              TextButton.icon(
+                onPressed: onDelete,
+                style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Hapus'),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

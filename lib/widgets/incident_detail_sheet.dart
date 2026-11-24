@@ -37,6 +37,8 @@ class IncidentDetailSheet extends StatelessWidget {
             const SizedBox(height: 8),
             _DetailRow(label: 'Waktu', value: formatDateTime(item.timestamp)),
             _DetailRow(label: 'Lokasi', value: item.locationLabel),
+            if (item.sourceLabel != null)
+              _DetailRow(label: 'Pemicu', value: item.sourceLabel!),
             _DetailRow(
                 label: 'Status', value: IncidentStatus.label(item.status)),
             const SizedBox(height: 12),

@@ -55,6 +55,24 @@ void main() {
     expect(find.text('Atur Kontak Darurat'), findsNothing);
   });
 
+  testWidgets('menampilkan jumlah kontak siap saat terdapat beberapa kontak (Feature #11)',
+      (tester) async {
+    const contact2 = EmergencyContact(
+      id: '2',
+      name: 'Pak Budi',
+      phoneNumber: '081234567891',
+    );
+    await tester.pumpWidget(
+      _subject(FakeEmergencyContactRepository(contacts: [testContact, contact2])),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('2 kontak darurat siap. Alert akan disiapkan untuk Ibu Sari dan 1 lainnya.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('memperingatkan jika belum ada kontak dan menuju layar kontak',
       (tester) async {
     await tester.pumpWidget(_subject(
@@ -116,5 +134,70 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('layar riwayat'), findsOneWidget);
+  });
+
+  group('Tombol SOS Manual (Feature #12)', () {
+    testWidgets('dapat diakses oleh pembaca layar', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(_subject(FakeEmergencyContactRepository()));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp('Tombol SOS manual darurat')),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('sentuhan singkat atau dibatalkan sebelum 2 detik tidak membuka insiden',
+        (tester) async {
+      var incidentOpened = false;
+      await tester.pumpWidget(_subject(
+        FakeEmergencyContactRepository(),
+        routes: {
+          '/incident': (_) {
+            incidentOpened = true;
+            return const Scaffold(body: Text('layar insiden'));
+          },
+        },
+      ));
+      await tester.pumpAndSettle();
+
+      final panicFinder = find.textContaining('SOS MANUAL');
+      expect(panicFinder, findsOneWidget);
+
+      // Tekan tombol lalu lepas setelah 1 detik (kurang dari 2 detik)
+      final gesture = await tester.startGesture(tester.getCenter(panicFinder));
+      await tester.pump(const Duration(seconds: 1));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(incidentOpened, isFalse);
+      expect(find.text('layar insiden'), findsNothing);
+    });
+
+    testWidgets('tekan dan tahan selama 2 detik membuka layar insiden dengan pemicu manual',
+        (tester) async {
+      Object? receivedArgs;
+      await tester.pumpWidget(_subject(
+        FakeEmergencyContactRepository(),
+        routes: {
+          '/incident': (context) {
+            receivedArgs = ModalRoute.of(context)?.settings.arguments;
+            return const Scaffold(body: Text('layar insiden'));
+          },
+        },
+      ));
+      await tester.pumpAndSettle();
+
+      final panicFinder = find.textContaining('SOS MANUAL');
+      final gesture = await tester.startGesture(tester.getCenter(panicFinder));
+      await tester.pump(const Duration(milliseconds: 2100));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(find.text('layar insiden'), findsOneWidget);
+      expect(receivedArgs, 'manual');
+    });
   });
 }

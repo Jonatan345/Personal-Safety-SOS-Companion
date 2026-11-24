@@ -82,7 +82,13 @@ export async function createServer({ dataFile = defaultDataFile } = {}) {
 
     const match = url.pathname.match(/^\/api\/incidents\/([^/]+)$/);
     if (match != null) {
-      const id = decodeURIComponent(match[1]);
+      let id;
+      try {
+        id = decodeURIComponent(match[1]);
+      } catch {
+        sendJson(response, 400, { error: 'Incident id is not valid.' });
+        return;
+      }
       const index = incidents.findIndex((item) => item.id === id);
       if (index < 0) {
         sendJson(response, 404, { error: 'Incident not found.' });
@@ -130,15 +136,19 @@ async function loadIncidents(dataFile) {
 }
 
 async function readIncident(request, response) {
-  let body = '';
+  const chunks = [];
+  let totalBytes = 0;
   let tooLarge = false;
   for await (const chunk of request) {
     if (tooLarge) continue;
-    body += chunk;
-    if (Buffer.byteLength(body) > maxBodySize) {
+    const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += bufferChunk.length;
+    if (totalBytes > maxBodySize) {
       tooLarge = true;
-      body = '';
+      chunks.length = 0;
+      continue;
     }
+    chunks.push(bufferChunk);
   }
   if (tooLarge) {
     sendJson(response, 413, { error: 'Request body is too large.' });
@@ -147,6 +157,7 @@ async function readIncident(request, response) {
 
   let incident;
   try {
+    const body = Buffer.concat(chunks).toString('utf8');
     incident = JSON.parse(body);
   } catch {
     sendJson(response, 400, { error: 'Request body must contain valid JSON.' });
@@ -156,7 +167,24 @@ async function readIncident(request, response) {
     sendJson(response, 400, { error: 'Incident fields are invalid.' });
     return null;
   }
-  return incident;
+  // Whitelist field: hanya simpan field yang diizinkan (Bug #4)
+  const sanitized = {
+    id: incident.id,
+    timestamp: incident.timestamp,
+    latitude: incident.latitude,
+    longitude: incident.longitude,
+    status: incident.status,
+  };
+  if (typeof incident.source === 'string') {
+    sanitized.source = incident.source;
+  }
+  if (typeof incident.isEstimatedLocation === 'boolean') {
+    sanitized.isEstimatedLocation = incident.isEstimatedLocation;
+  }
+  if (typeof incident.locationNote === 'string') {
+    sanitized.locationNote = incident.locationNote;
+  }
+  return sanitized;
 }
 
 function isCoordinate(value, limit) {

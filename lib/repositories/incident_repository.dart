@@ -12,9 +12,18 @@ class IncidentRepository {
   IncidentRepository([this._api]);
 
   static const boxName = LocalStorageService.incidentsBox;
+  static const pendingDeletionsBoxName =
+      LocalStorageService.pendingDeletionsBox;
   final IncidentApi? _api;
 
   Box<String> get _box => Hive.box<String>(boxName);
+
+  Future<Box<String>> _getPendingDeletionsBox() async {
+    if (!Hive.isBoxOpen(pendingDeletionsBoxName)) {
+      return await Hive.openBox<String>(pendingDeletionsBoxName);
+    }
+    return Hive.box<String>(pendingDeletionsBoxName);
+  }
 
   /// true jika API_BASE_URL diatur sehingga data bisa dimuat dari backend.
   bool get syncEnabled => _api != null;
@@ -30,7 +39,8 @@ class IncidentRepository {
         }
       } on FormatException catch (error) {
         // Satu catatan rusak tidak boleh menggagalkan seluruh riwayat.
-        AppLogger.instance.warning('data', 'Melewati catatan insiden rusak', error);
+        AppLogger.instance
+            .warning('data', 'Melewati catatan insiden rusak', error);
       }
     }
     incidents.sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -53,24 +63,53 @@ class IncidentRepository {
   Future<void> deleteIncident(String id) async {
     await LocalStorageService.ensureReady();
     await _box.delete(id);
-    await _mirrorToServer('hapus insiden', (api) => api.deleteIncident(id));
+    final pendingBox = await _getPendingDeletionsBox();
+    await pendingBox.put(id, id);
+    if (_api != null) {
+      try {
+        await _api.deleteIncident(id);
+        await pendingBox.delete(id);
+      } catch (error) {
+        AppLogger.instance
+            .warning('sync', 'Sinkronisasi (hapus insiden) gagal', error);
+      }
+    }
   }
 
   /// Memuat insiden dari backend lalu menggabungkannya dengan data lokal.
   /// Perangkat adalah sumber utama: insiden yang hanya ada di server disimpan
   /// ke perangkat, sedangkan insiden yang belum ada di server (atau statusnya
-  /// berbeda) dikirim ke server. Melempar [IncidentApiException] (dengan
-  /// `userMessage` Bahasa Indonesia) jika server tidak dapat dihubungi; data
-  /// lokal tidak berubah pada kegagalan.
-  /// Catatan: penghapusan yang gagal dikirim ke server dapat muncul kembali.
+  /// berbeda) dikirim ke server.
+  /// Insiden yang telah dihapus di lokal tetapi belum terhapus di server (karena offline)
+  /// tidak ditarik kembali (Bug #8), dan penghapusannya dikirim ulang ke server.
   Future<List<Incident>> syncFromServer() async {
     final api = _api;
     if (api == null) return getAllIncidents();
     await LocalStorageService.ensureReady();
+    final pendingBox = await _getPendingDeletionsBox();
+
+    // Pertahankan tombstone sampai GET membuktikan item tidak lagi ada pada
+    // server. Server yang akhirnya konsisten tidak boleh menariknya kembali.
+    final pendingIds = pendingBox.keys.cast<String>().toSet();
+    for (final deletedId in pendingIds) {
+      try {
+        await api.deleteIncident(deletedId);
+      } catch (error) {
+        AppLogger.instance.warning(
+          'sync',
+          'Gagal mengirim ulang penghapusan insiden $deletedId ke server',
+          error,
+        );
+      }
+    }
 
     final remote = await api.getIncidents();
     final local = await getAllIncidents();
-    await _pullMissing(remote, local);
+    await _pullMissing(remote, local, pendingIds);
+    final remoteIds = {for (final incident in remote) incident.id};
+    for (final deletedId in pendingIds) {
+      if (!remoteIds.contains(deletedId)) await pendingBox.delete(deletedId);
+    }
     await _pushDifferences(api, remote, local);
     AppLogger.instance.info(
       'sync',
@@ -79,10 +118,17 @@ class IncidentRepository {
     return getAllIncidents();
   }
 
-  Future<void> _pullMissing(List<Incident> remote, List<Incident> local) async {
+  Future<void> _pullMissing(
+    List<Incident> remote,
+    List<Incident> local, [
+    Set<String> pendingDeletions = const {},
+  ]) async {
     final localIds = {for (final incident in local) incident.id};
     for (final incident in remote) {
-      if (!localIds.contains(incident.id)) await _put(incident);
+      if (!localIds.contains(incident.id) &&
+          !pendingDeletions.contains(incident.id)) {
+        await _put(incident);
+      }
     }
   }
 
@@ -103,12 +149,15 @@ class IncidentRepository {
         }
       }
     } on IncidentApiException catch (error) {
-      AppLogger.instance.warning('sync', 'Gagal mengunggah perubahan insiden', error);
+      AppLogger.instance
+          .warning('sync', 'Gagal mengunggah perubahan insiden', error);
     }
   }
 
   Future<void> _put(Incident incident) async {
     await LocalStorageService.ensureReady();
+    final pendingBox = await _getPendingDeletionsBox();
+    await pendingBox.delete(incident.id);
     await _box.put(incident.id, jsonEncode(incident.toJson()));
   }
 

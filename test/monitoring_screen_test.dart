@@ -6,8 +6,38 @@ import 'package:noise_meter/noise_meter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:sos_companion/screens/monitoring_screen.dart';
+import 'package:sos_companion/services/foreground_service.dart';
 import 'package:sos_companion/services/monitoring_service.dart';
 import 'package:sos_companion/services/permission_service.dart';
+
+class FakeForegroundTaskGateway implements ForegroundTaskGateway {
+  bool isStarted = false;
+  int startCount = 0;
+  int stopCount = 0;
+  int notifyTriggeredCount = 0;
+  VoidCallback? stopCallback;
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  Future<void> startService({required VoidCallback onStopRequested}) async {
+    isStarted = true;
+    startCount++;
+    stopCallback = onStopRequested;
+  }
+
+  @override
+  Future<void> stopService() async {
+    isStarted = false;
+    stopCount++;
+  }
+
+  @override
+  Future<void> notifyTriggered() async {
+    notifyTriggeredCount++;
+  }
+}
 
 class FakePermissionService extends PermissionService {
   FakePermissionService(
@@ -65,12 +95,14 @@ const _denied = PermissionResult(microphone: PermissionStatus.denied);
 Widget _subject({
   required PermissionService permissions,
   required MonitoringServiceFactory factory,
+  ForegroundTaskGateway? foregroundGateway,
   Map<String, WidgetBuilder> routes = const {},
 }) {
   return MaterialApp(
     home: MonitoringScreen(
       permissionService: permissions,
       monitoringFactory: factory,
+      foregroundTaskGateway: foregroundGateway ?? FakeForegroundTaskGateway(),
     ),
     routes: routes,
   );
@@ -246,6 +278,93 @@ void main() {
       await tester.tap(find.text('Kembali dari insiden'));
       await tester.pumpAndSettle();
     }
+  });
+
+  group('Foreground Service Background Monitoring (Feature #10)', () {
+    testWidgets('memulai foreground service saat sensor aktif dan menghentikannya saat stop',
+        (tester) async {
+      final fakeForeground = FakeForegroundTaskGateway();
+      await tester.pumpWidget(_subject(
+        permissions: FakePermissionService(() async => _granted),
+        foregroundGateway: fakeForeground,
+        factory: ({required onTrigger, required onError}) =>
+            FakeMonitoringController(
+          startResult: Future<void>.value(),
+          onTrigger: onTrigger,
+          onError: onError,
+          events: [],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(fakeForeground.isStarted, isTrue);
+      expect(fakeForeground.startCount, 1);
+
+      // Tekan tombol Hentikan Monitoring di UI
+      await tester.tap(find.text('Hentikan Monitoring'));
+      await tester.pumpAndSettle();
+
+      expect(fakeForeground.isStarted, isFalse);
+      expect(fakeForeground.stopCount, greaterThanOrEqualTo(1));
+    });
+
+    testWidgets('tombol Hentikan pada notifikasi permanen menghentikan monitoring',
+        (tester) async {
+      final fakeForeground = FakeForegroundTaskGateway();
+      await tester.pumpWidget(_subject(
+        permissions: FakePermissionService(() async => _granted),
+        foregroundGateway: fakeForeground,
+        factory: ({required onTrigger, required onError}) =>
+            FakeMonitoringController(
+          startResult: Future<void>.value(),
+          onTrigger: onTrigger,
+          onError: onError,
+          events: [],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(fakeForeground.isStarted, isTrue);
+      expect(fakeForeground.stopCallback, isNotNull);
+
+      // Simulasikan pengguna menekan tombol "Hentikan" di notifikasi sistem
+      fakeForeground.stopCallback!();
+      await tester.pumpAndSettle();
+
+      expect(fakeForeground.isStarted, isFalse);
+    });
+
+    testWidgets('pemicu sensor memanggil notifyTriggered pada foreground service',
+        (tester) async {
+      final fakeForeground = FakeForegroundTaskGateway();
+      late final void Function(TriggerSource) triggerFn;
+
+      await tester.pumpWidget(_subject(
+        permissions: FakePermissionService(() async => _granted),
+        foregroundGateway: fakeForeground,
+        factory: ({required onTrigger, required onError}) {
+          triggerFn = onTrigger;
+          return FakeMonitoringController(
+            startResult: Future<void>.value(),
+            onTrigger: onTrigger,
+            onError: onError,
+            events: [],
+          );
+        },
+        routes: {
+          '/incident': (_) => const Scaffold(body: Text('layar insiden')),
+        },
+      ));
+      await tester.pumpAndSettle();
+
+      expect(fakeForeground.notifyTriggeredCount, 0);
+
+      triggerFn(TriggerSource.motion);
+      await tester.pumpAndSettle();
+
+      expect(fakeForeground.notifyTriggeredCount, 1);
+      expect(find.text('layar insiden'), findsOneWidget);
+    });
   });
 }
 

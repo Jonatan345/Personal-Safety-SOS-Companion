@@ -302,4 +302,52 @@ void main() {
       expect(find.text('Simpan Kontak'), findsOneWidget);
     });
   });
+
+  group('dukungan multi kontak di UI (Feature #11)', () {
+    testWidgets('menampilkan daftar beberapa kontak dengan prioritas',
+        (tester) async {
+      const contact2 = EmergencyContact(
+        id: '2',
+        name: 'Pak Budi',
+        phoneNumber: '081234567891',
+      );
+      final repository = FakeEmergencyContactRepository(
+        contacts: [testContact, contact2],
+      );
+      await _pumpScreen(tester, repository);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Prioritas #1'), findsOneWidget);
+      expect(find.text('Prioritas #2'), findsOneWidget);
+      expect(find.text('Ibu Sari'), findsOneWidget);
+      expect(find.text('Pak Budi'), findsOneWidget);
+      expect(find.text('Tambah Kontak'), findsOneWidget);
+    });
+
+    testWidgets('bisa menghapus salah satu kontak setelah konfirmasi',
+        (tester) async {
+      const contact2 = EmergencyContact(
+        id: '2',
+        name: 'Pak Budi',
+        phoneNumber: '081234567891',
+      );
+      final repository = FakeEmergencyContactRepository(
+        contacts: [testContact, contact2],
+      );
+      await _pumpScreen(tester, repository);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hapus'), findsNWidgets(2));
+      await tester.tap(find.text('Hapus').at(0));
+      await tester.pumpAndSettle();
+
+      // Dialog konfirmasi muncul
+      expect(find.text('Hapus kontak darurat?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Hapus'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ibu Sari'), findsNothing);
+      expect(find.text('Pak Budi'), findsOneWidget);
+    });
+  });
 }

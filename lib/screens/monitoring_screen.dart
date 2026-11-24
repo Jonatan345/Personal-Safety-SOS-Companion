@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../routes/app_routes.dart';
 import '../services/app_logger.dart';
+import '../services/foreground_service.dart';
 import '../services/monitoring_service.dart';
 import '../services/permission_service.dart';
 import '../theme/app_theme.dart';
@@ -22,6 +23,7 @@ class MonitoringScreen extends StatefulWidget {
     super.key,
     this.permissionService,
     this.monitoringFactory,
+    this.foregroundTaskGateway,
   });
 
   @visibleForTesting
@@ -29,6 +31,9 @@ class MonitoringScreen extends StatefulWidget {
 
   @visibleForTesting
   final MonitoringServiceFactory? monitoringFactory;
+
+  @visibleForTesting
+  final ForegroundTaskGateway? foregroundTaskGateway;
 
   @override
   State<MonitoringScreen> createState() => _MonitoringScreenState();
@@ -41,6 +46,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
   late final PermissionService _permissions;
   late final MonitoringServiceFactory _monitoringFactory;
+  late final ForegroundTaskGateway _foregroundService;
   MonitoringController? _monitoring;
   bool _loading = true;
   String? _error;
@@ -51,6 +57,8 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   void initState() {
     super.initState();
     _permissions = widget.permissionService ?? PermissionService();
+    _foregroundService =
+        widget.foregroundTaskGateway ?? AppForegroundService.instance;
     _monitoringFactory = widget.monitoringFactory ??
         ({required onTrigger, required onError}) => MonitoringService(
               onTrigger: onTrigger,
@@ -94,6 +102,11 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       await service.start().timeout(_sensorStartTimeout);
       if (_isCurrentAttempt(attempt)) {
         AppLogger.instance.info('monitoring', 'Sensor aktif');
+        unawaited(_foregroundService.startService(
+          onStopRequested: () {
+            if (mounted) _stop();
+          },
+        ));
         setState(() => _loading = false);
       }
     } catch (error) {
@@ -128,9 +141,11 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
   Future<void> _disposeMonitoring() async {
     final service = _monitoring;
-    if (service == null) return;
-    await service.dispose().timeout(_cleanupTimeout);
-    if (identical(_monitoring, service)) _monitoring = null;
+    if (service != null) {
+      await service.dispose().timeout(_cleanupTimeout);
+      if (identical(_monitoring, service)) _monitoring = null;
+    }
+    await _foregroundService.stopService();
   }
 
   Future<void> _handleStartFailure(int attempt, String message) async {
@@ -181,6 +196,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     }
     _triggerHandled = true;
     AppLogger.instance.info('monitoring', 'Pemicu terdeteksi: ${source.name}');
+    unawaited(_foregroundService.notifyTriggered());
     try {
       await Navigator.pushNamed(context, AppRoutes.incident,
           arguments: source.name);
@@ -192,6 +208,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   }
 
   void _stop() {
+    unawaited(_foregroundService.stopService());
     showMessage(ScaffoldMessenger.of(context), 'Monitoring dihentikan');
     Navigator.pop(context);
   }

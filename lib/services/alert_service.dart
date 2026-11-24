@@ -8,7 +8,11 @@ import 'package:url_launcher/url_launcher.dart';
 /// melempar error: mengembalikan null jika berhasil, atau alasan gagal yang
 /// dapat ditampilkan ke pengguna.
 abstract class AlertGateway {
-  Future<String?> showEmergencyNotification(String body);
+  Future<String?> showEmergencyNotification(
+    String body, {
+    int? id,
+    String? title,
+  });
   Future<String?> openSmsComposer({
     required String phone,
     required String message,
@@ -35,7 +39,11 @@ class AlertService implements AlertGateway {
   }
 
   @override
-  Future<String?> showEmergencyNotification(String body) async {
+  Future<String?> showEmergencyNotification(
+    String body, {
+    int? id,
+    String? title,
+  }) async {
     try {
       final status = await Permission.notification.status.timeout(_timeout);
       if (status.isPermanentlyDenied) {
@@ -47,10 +55,13 @@ class AlertService implements AlertGateway {
             'ditampilkan.';
       }
       if (!_initialised) await initialise();
+      // Gunakan ID unik agar insiden tidak saling menimpa (Bug #9)
+      final notificationId =
+          id ?? (DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF);
       await _notifications
           .show(
-            1,
-            'SOS alert dipicu',
+            notificationId,
+            title ?? 'SOS alert dipicu',
             body,
             const NotificationDetails(
               android: AndroidNotificationDetails(
@@ -69,17 +80,24 @@ class AlertService implements AlertGateway {
     }
   }
 
+  Uri createSmsUri({
+    required String phone,
+    required String message,
+  }) {
+    return Uri(
+      scheme: 'sms',
+      path: phone,
+      query: 'body=${Uri.encodeComponent(message)}',
+    );
+  }
+
   @override
   Future<String?> openSmsComposer({
     required String phone,
     required String message,
   }) async {
     try {
-      final uri = Uri(
-        scheme: 'sms',
-        path: phone,
-        queryParameters: {'body': message},
-      );
+      final uri = createSmsUri(phone: phone, message: message);
       final opened = await launchUrl(
         uri,
         mode: LaunchMode.externalApplication,
@@ -91,4 +109,5 @@ class AlertService implements AlertGateway {
       return 'Aplikasi SMS tidak dapat dibuka. Hubungi kontak darurat manual.';
     }
   }
+  return null;
 }

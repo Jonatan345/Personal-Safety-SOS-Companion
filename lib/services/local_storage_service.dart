@@ -11,6 +11,7 @@ class LocalStorageService {
   static const contactsBox = 'emergency_contacts_v2';
   static const incidentsBox = 'incidents_v2';
   static const logsBox = 'app_logs_v1';
+  static const pendingDeletionsBox = 'pending_deletions_v1';
 
   static Future<void>? _ready;
 
@@ -34,6 +35,9 @@ class LocalStorageService {
     }
     if (!Hive.isBoxOpen(logsBox)) {
       await Hive.openBox<String>(logsBox);
+    }
+    if (!Hive.isBoxOpen(pendingDeletionsBox)) {
+      await Hive.openBox<String>(pendingDeletionsBox);
     }
   }
 }

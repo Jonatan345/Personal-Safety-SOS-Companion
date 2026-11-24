@@ -110,3 +110,103 @@ test('rejects an incident with only one coordinate', async () => {
   });
   assert.equal(response.status, 400);
 });
+
+test('handles malformed percent-encoding in incident id with 400 instead of 500', async () => {
+  const patchResponse = await fetch(`${baseUrl}/api/incidents/%E0%A4%A`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...incident, id: '%E0%A4%A' }),
+  });
+  assert.equal(patchResponse.status, 400);
+  assert.deepEqual(await patchResponse.json(), {
+    error: 'Incident id is not valid.',
+  });
+
+  const deleteResponse = await fetch(`${baseUrl}/api/incidents/%E0%A4%A`, {
+    method: 'DELETE',
+  });
+  assert.equal(deleteResponse.status, 400);
+  assert.deepEqual(await deleteResponse.json(), {
+    error: 'Incident id is not valid.',
+  });
+});
+
+test('preserves multibyte UTF-8 characters split across multiple request chunks', async () => {
+  const http = await import('node:http');
+  const specialText = 'Jatuh di jalan — é 🚨';
+  const payload = JSON.stringify({
+    ...incident,
+    id: 'incident-utf8-chunk',
+    status: 'sent',
+    source: specialText,
+  });
+
+  const payloadBuffer = Buffer.from(payload, 'utf8');
+  // Find a split point right in the middle of the multibyte sequence for '—' (e2 80 94)
+  const dashIndex = payloadBuffer.indexOf(Buffer.from('—', 'utf8'));
+  const splitPoint = dashIndex + 1; // split right inside the 3-byte em-dash
+
+  const part1 = payloadBuffer.subarray(0, splitPoint);
+  const part2 = payloadBuffer.subarray(splitPoint);
+
+  const parsedUrl = new URL(`${baseUrl}/api/incidents`);
+  const response = await new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: parsedUrl.hostname,
+        port: parsedUrl.port,
+        path: parsedUrl.pathname,
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': payloadBuffer.length,
+        },
+      },
+      (res) => {
+        const bodyChunks = [];
+        res.on('data', (c) => bodyChunks.push(c));
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode,
+            body: JSON.parse(Buffer.concat(bodyChunks).toString('utf8')),
+          });
+        });
+      },
+    );
+    req.on('error', reject);
+    req.write(part1);
+    setTimeout(() => {
+      req.write(part2);
+      req.end();
+    }, 10);
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.body.source, specialText);
+});
+
+test('strips arbitrary extra fields not in whitelist from stored incident (Bug #4)', async () => {
+  const response = await fetch(`${baseUrl}/api/incidents`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      ...incident,
+      id: 'incident-whitelist',
+      junk: 'malicious-or-unwanted',
+      extraField: 12345,
+    }),
+  });
+  assert.equal(response.status, 201);
+  const json = await response.json();
+  assert.equal(json.id, 'incident-whitelist');
+  assert.equal(json.junk, undefined);
+  assert.equal(json.extraField, undefined);
+
+  const listResponse = await fetch(`${baseUrl}/api/incidents`);
+  const list = await listResponse.json();
+  const stored = list.find((item) => item.id === 'incident-whitelist');
+  assert.ok(stored);
+  assert.equal(stored.junk, undefined);
+  assert.equal(stored.extraField, undefined);
+});
+

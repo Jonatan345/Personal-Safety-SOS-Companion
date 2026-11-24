@@ -20,24 +20,69 @@ import '../widgets/primary_button.dart';
 /// Layar hitung mundur insiden. Layar ini hanya mengurus tampilan, timer, dan
 /// navigasi; alur lokasi, penyimpanan, dan alert ada di [IncidentReporter].
 class IncidentScreen extends ConsumerStatefulWidget {
-  const IncidentScreen({super.key, this.locationProvider, this.alerts});
+  const IncidentScreen({
+    super.key,
+    this.locationProvider,
+    this.alerts,
+    this.source,
+    this.countdownSeconds,
+  });
 
   final Future<IncidentLocation> Function()? locationProvider;
   final AlertGateway? alerts;
+  final String? source;
+  final int? countdownSeconds;
 
   @override
   ConsumerState<IncidentScreen> createState() => _IncidentScreenState();
 }
 
 class _IncidentScreenState extends ConsumerState<IncidentScreen> {
-  int secondsLeft = SosConfig.countdownSeconds;
+  late int secondsLeft;
   Timer? timer;
   bool _isCompleting = false;
+  String? _pendingStatus;
   String? _error;
+  String? _source;
+  bool _initializedArgs = false;
 
   @override
   void initState() {
     super.initState();
+    _source = widget.source;
+    secondsLeft = widget.countdownSeconds ??
+        (_source == 'manual' ? 3 : SosConfig.countdownSeconds);
+    _startTimer();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedArgs) {
+      _initializedArgs = true;
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is String && _source == null) {
+        _source = args;
+        if (widget.countdownSeconds == null && _source == 'manual') {
+          setState(() {
+            secondsLeft = 3;
+          });
+        }
+      } else if (args is Map<String, dynamic>) {
+        if (_source == null && args['source'] is String) {
+          _source = args['source'] as String;
+        }
+        if (widget.countdownSeconds == null && args['countdown'] is int) {
+          setState(() {
+            secondsLeft = args['countdown'] as int;
+          });
+        }
+      }
+    }
+  }
+
+  void _startTimer() {
+    timer?.cancel();
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (secondsLeft <= 1) {
         t.cancel();
@@ -51,7 +96,8 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
   IncidentReporter _createReporter() => IncidentReporter(
         locate: widget.locationProvider ?? LocationService().currentPosition,
         save: ref.read(incidentNotifierProvider.notifier).addIncident,
-        loadContact: ref.read(emergencyContactRepositoryProvider).fetchContact,
+        loadContacts:
+            ref.read(emergencyContactRepositoryProvider).fetchContacts,
         alerts: widget.alerts ?? AlertService.instance,
       );
 
@@ -59,6 +105,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     if (!mounted || _isCompleting) return;
     setState(() {
       _isCompleting = true;
+      _pendingStatus = status;
       _error = null;
     });
     timer?.cancel();
@@ -70,7 +117,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     final reporter = _createReporter();
 
     try {
-      final report = await reporter.report(status);
+      final report = await reporter.report(status, source: _source);
       if (!report.isSent) {
         if (report.notes.isNotEmpty) {
           showMessage(messenger, report.notes.join('\n'));
@@ -151,10 +198,10 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       children: [
         const Icon(Icons.error_outline, color: Colors.white, size: 56),
         const SizedBox(height: 16),
-        const Text(
-          'Mendeteksi Insiden',
+        Text(
+          _source == 'manual' ? 'SOS Manual Dipicu' : 'Mendeteksi Insiden',
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 24,
             fontWeight: FontWeight.w800,
@@ -204,13 +251,19 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
         const SizedBox(height: 32),
         PrimaryButton(
           label: _isCompleting
-              ? 'Mengambil lokasi...'
+              ? (_pendingStatus == IncidentStatus.cancelled
+                  ? 'Membatalkan...'
+                  : 'Mengambil lokasi...')
               : 'Batalkan (Ini Bukan Darurat)',
           color: Colors.white,
           foregroundColor: AppColors.danger,
-          onPressed:
-              _isCompleting ? null : () => _finishIncident(IncidentStatus.cancelled),
+          onPressed: _isCompleting
+              ? null
+              : () => _finishIncident(IncidentStatus.cancelled),
           loading: _isCompleting,
+          loadingLabel: _pendingStatus == IncidentStatus.cancelled
+              ? 'Membatalkan...'
+              : 'Mengambil lokasi...',
         ),
       ],
     );

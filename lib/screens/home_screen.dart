@@ -5,6 +5,7 @@ import '../notifiers/emergency_contact_notifier.dart';
 import '../routes/app_routes.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_card.dart';
+import '../widgets/manual_sos_button.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/responsive_body.dart';
 
@@ -57,7 +58,9 @@ class HomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const _Header(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+              const ManualSosButton(),
+              const SizedBox(height: 20),
               if (wide)
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,7 +153,9 @@ class _ReadinessCard extends ConsumerWidget {
           ? _Readiness(
               icon: Icons.check_circle_outline,
               color: AppColors.success,
-              text: 'Alert akan disiapkan untuk ${state.contact!.name}.',
+              text: state.contactCount <= 1
+                  ? 'Alert akan disiapkan untuk ${state.contact!.name}.'
+                  : '${state.contactCount} kontak darurat siap. Alert akan disiapkan untuk ${state.contact!.name} dan ${state.contactCount - 1} lainnya.',
             )
           : const _Readiness(
               icon: Icons.warning_amber_rounded,

@@ -103,4 +103,66 @@ void main() {
     expect(restored.name, contact.name);
     expect(restored.phoneNumber, contact.phoneNumber);
   });
+
+  group('dukungan beberapa kontak (Feature #11)', () {
+    test('bisa menambah hingga 5 kontak dengan urutan prioritas', () async {
+      final repository = HiveEmergencyContactRepository();
+      for (var i = 1; i <= 5; i++) {
+        await repository.addContact(
+          EmergencyContactDraft(name: 'Kontak $i', phoneNumber: '0812$i'),
+        );
+      }
+
+      final contacts = await repository.fetchContacts();
+      expect(contacts.length, 5);
+      expect(contacts.first.name, 'Kontak 1');
+      expect(contacts.last.name, 'Kontak 5');
+
+      // Kontak ke-6 melebihi batas maksimal 5
+      await expectLater(
+        repository.addContact(
+          const EmergencyContactDraft(name: 'Kontak 6', phoneNumber: '08126'),
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('bisa mengubah urutan kontak (reorder)', () async {
+      final repository = HiveEmergencyContactRepository();
+      await repository.addContact(
+        const EmergencyContactDraft(name: 'Kontak A', phoneNumber: '0811'),
+      );
+      await repository.addContact(
+        const EmergencyContactDraft(name: 'Kontak B', phoneNumber: '0812'),
+      );
+
+      await repository.reorderContacts(1, 0);
+
+      final contacts = await repository.fetchContacts();
+      expect(contacts[0].name, 'Kontak B');
+      expect(contacts[1].name, 'Kontak A');
+    });
+
+    test('bisa memperbarui dan menghapus kontak', () async {
+      final repository = HiveEmergencyContactRepository();
+      final c1 = await repository.addContact(
+        const EmergencyContactDraft(name: 'Kontak A', phoneNumber: '0811'),
+      );
+      await repository.addContact(
+        const EmergencyContactDraft(name: 'Kontak B', phoneNumber: '0812'),
+      );
+
+      await repository.updateContact(
+        EmergencyContact(id: c1.id, name: 'Kontak A Edit', phoneNumber: '0819'),
+      );
+      var contacts = await repository.fetchContacts();
+      expect(contacts.first.name, 'Kontak A Edit');
+      expect(contacts.first.phoneNumber, '0819');
+
+      await repository.deleteContact(c1.id);
+      contacts = await repository.fetchContacts();
+      expect(contacts.length, 1);
+      expect(contacts.first.name, 'Kontak B');
+    });
+  });
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sos_companion/models/emergency_contact.dart';
@@ -93,6 +95,24 @@ void main() {
 
     expect(repository.stored.single.status, 'cancelled');
     expect(alerts.smsMessages, isEmpty);
+  });
+
+  testWidgets('displays "Membatalkan..." when cancellation is in progress (Bug #7)', (
+    tester,
+  ) async {
+    final saveGate = Completer<void>();
+    final repository = FakeIncidentRepository(saveGate: saveGate);
+    final alerts = FakeAlerts();
+    await tester.pumpWidget(_subject(repository, alerts: alerts));
+
+    await tester.tap(find.text(_cancelLabel));
+    await tester.pump(); // Start cancelling, awaiting repository save
+
+    expect(find.text('Membatalkan...'), findsOneWidget);
+    expect(find.text('Mengambil lokasi...'), findsNothing);
+
+    saveGate.complete();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('the system back button counts as cancelling, not as silence', (

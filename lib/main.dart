@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'routes/app_routes.dart';
 import 'services/alert_service.dart';
 import 'services/app_logger.dart';
+import 'services/foreground_service.dart';
 import 'services/local_storage_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_info.dart';
@@ -48,6 +49,7 @@ Future<void> _warmUpDeviceServices() async {
   }
   try {
     await AlertService.instance.initialise();
+    await AppForegroundService.instance.init();
   } catch (error, stack) {
     AppLogger.instance.error('app', 'Notifikasi gagal disiapkan', error, stack);
   }

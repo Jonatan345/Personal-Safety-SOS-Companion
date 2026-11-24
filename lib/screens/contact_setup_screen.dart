@@ -27,6 +27,7 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
   final _nameFocusNode = FocusNode();
   final _phoneFocusNode = FocusNode();
   bool _showForm = false;
+  EmergencyContact? _editingContact;
 
   @override
   void dispose() {
@@ -38,6 +39,7 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
   }
 
   void _openForm([EmergencyContact? contact]) {
+    _editingContact = contact;
     _nameController.text = contact?.name ?? '';
     _phoneController.text = contact?.phoneNumber ?? '';
     setState(() => _showForm = true);
@@ -52,13 +54,17 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
                 name: _nameController.text.trim(),
                 phoneNumber: _phoneController.text.trim(),
               ),
+              editId: _editingContact?.id,
             );
     if (!mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
     switch (result) {
       case ContactSaveResult.saved:
-        setState(() => _showForm = false);
+        setState(() {
+          _showForm = false;
+          _editingContact = null;
+        });
         showMessage(messenger, 'Kontak darurat berhasil disimpan',
             replace: true);
       case ContactSaveResult.failed:
@@ -72,6 +78,43 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
       case ContactSaveResult.alreadySaving:
         break;
     }
+  }
+
+  Future<void> _deleteContact(EmergencyContact contact) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus kontak darurat?'),
+        content: Text(
+          'Kontak "${contact.name}" akan dihapus dari daftar kontak darurat.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      final success = await ref
+          .read(emergencyContactNotifierProvider.notifier)
+          .delete(contact.id);
+      if (mounted && success) {
+        showMessage(ScaffoldMessenger.of(context), 'Kontak berhasil dihapus');
+      }
+    }
+  }
+
+  void _reorder(int oldIndex, int newIndex) {
+    ref
+        .read(emergencyContactNotifierProvider.notifier)
+        .reorder(oldIndex, newIndex);
   }
 
   @override
@@ -110,6 +153,7 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
 
   Widget _buildContent(EmergencyContactViewState viewState) {
     final contact = viewState.contact;
+    final contacts = viewState.contacts;
     return ListView(
       padding: const EdgeInsets.all(20),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -118,11 +162,16 @@ class _ContactSetupScreenState extends ConsumerState<ContactSetupScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               if (!_showForm) {
-                return contact == null
-                    ? EmptyContactCard(onAddContact: _openForm)
+                return !viewState.hasContact
+                    ? EmptyContactCard(onAddContact: () => _openForm(null))
                     : LoadedContactCard(
-                        contact: contact,
-                        onEdit: () => _openForm(contact),
+                        contact: contact ?? contacts.first,
+                        contacts: contacts,
+                        onEdit: (c) => _openForm(c),
+                        onDelete: (c) => _deleteContact(c),
+                        onMoveUp: (index) => _reorder(index, index - 1),
+                        onMoveDown: (index) => _reorder(index, index + 2),
+                        onAddMore: () => _openForm(null),
                       );
               }
               return _buildFormLayout(

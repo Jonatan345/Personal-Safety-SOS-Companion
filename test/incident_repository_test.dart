@@ -237,5 +237,45 @@ void main() {
       );
       expect((await repository.getAllIncidents()).single.id, 'lokal');
     });
+
+    test('insiden yang dihapus saat offline tidak ditarik kembali dan dikirim ulang saat online (Bug #8)',
+        () async {
+      final serverItem = buildIncident(id: 'del-1', timestamp: _day(1));
+      final requests = <String>[];
+
+      // Skenario 1: Server offline saat deleteIncident dipanggil
+      final offlineClient = MockClient((request) async {
+        throw http.ClientException('offline');
+      });
+      final repoOffline = IncidentRepository(_apiWith(offlineClient));
+      await repoOffline.addIncident(serverItem);
+
+      // Hapus saat offline
+      await repoOffline.deleteIncident('del-1');
+      expect((await repoOffline.getAllIncidents()), isEmpty);
+
+      // Skenario 2: Server kembali online, tetapi masih memiliki data 'del-1'
+      final onlineClient = MockClient((request) async {
+        requests.add('${request.method} ${request.url.path}');
+        if (request.method == 'GET') {
+          // Server masih punya del-1
+          return http.Response(jsonEncode([serverItem.toJson()]), 200);
+        }
+        if (request.method == 'DELETE') {
+          return http.Response('', 204);
+        }
+        return http.Response('', 200);
+      });
+      final repoOnline = IncidentRepository(_apiWith(onlineClient));
+
+      final result = await repoOnline.syncFromServer();
+
+      // del-1 tidak ditarik kembali ke lokal
+      expect(result.map((i) => i.id), isNot(contains('del-1')));
+      expect((await repoOnline.getAllIncidents()), isEmpty);
+
+      // DELETE dikirim ulang ke server
+      expect(requests, contains('DELETE /api/incidents/del-1'));
+    });
   });
 }
