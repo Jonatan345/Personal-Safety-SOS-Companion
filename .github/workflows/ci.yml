@@ -41,6 +41,13 @@ jobs:
       - name: Unit and widget tests
         run: flutter test
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Backend tests
+        run: node --test backend/server.test.mjs
+
       - name: Siapkan kunci rilis (opsional, dari GitHub Secrets)
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}

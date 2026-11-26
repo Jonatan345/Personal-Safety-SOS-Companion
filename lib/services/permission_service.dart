@@ -5,11 +5,21 @@ import 'package:permission_handler/permission_handler.dart';
 class PermissionService {
   static const _permissionTimeout = Duration(seconds: 12);
 
-  /// Monitoring needs microphone access; location is requested only for SOS.
+  /// Monitoring memerlukan izin mikrofon. Izin lokasi juga diminta di awal
+  /// (Fix #16) agar dialog izin tidak muncul dan menunda pengiriman SMS saat
+  /// kondisi darurat, tetapi tidak memblokir monitoring jika ditolak.
   Future<PermissionResult> requestMonitoringPermissions() async {
     try {
       final microphone = await _request(Permission.microphone);
-      return PermissionResult(microphone: microphone);
+      PermissionStatus? location;
+      if (microphone.isGranted) {
+        try {
+          location = await _request(Permission.locationWhenInUse);
+        } catch (_) {
+          // Kegagalan/timeout izin lokasi tidak boleh menggagalkan monitoring.
+        }
+      }
+      return PermissionResult(microphone: microphone, location: location);
     } on TimeoutException {
       return const PermissionResult(
         microphone: PermissionStatus.denied,
@@ -47,9 +57,14 @@ class PermissionService {
 }
 
 class PermissionResult {
-  const PermissionResult({required this.microphone, this.failure});
+  const PermissionResult({
+    required this.microphone,
+    this.location,
+    this.failure,
+  });
 
   final PermissionStatus microphone;
+  final PermissionStatus? location;
   final String? failure;
 
   bool get canMonitor => microphone.isGranted;

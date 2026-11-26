@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:hive/hive.dart';
@@ -48,9 +49,12 @@ class IncidentRepository {
   }
 
   Future<Incident> addIncident(Incident incident) async {
+    // Simpan lokal terlebih dahulu agar proses SMS darurat tidak tertunda (Fix #15).
     await _put(incident);
-    await _mirrorToServer(
-        'tambah insiden', (api) => api.createIncident(incident));
+    // Kirim ke server di background tanpa ditunggu; kegagalan ditangani di _mirrorToServer.
+    unawaited(
+      _mirrorToServer('tambah insiden', (api) => api.createIncident(incident)),
+    );
     return incident;
   }
 
@@ -81,7 +85,7 @@ class IncidentRepository {
   /// ke perangkat, sedangkan insiden yang belum ada di server (atau statusnya
   /// berbeda) dikirim ke server.
   /// Insiden yang telah dihapus di lokal tetapi belum terhapus di server (karena offline)
-  /// tidak ditarik kembali (Bug #8), dan penghapusannya dikirim ulang ke server.
+  /// tidak ditarik kembali (Bug #8 & #17), dan penghapusannya dikirim ulang ke server.
   Future<List<Incident>> syncFromServer() async {
     final api = _api;
     if (api == null) return getAllIncidents();
@@ -105,11 +109,21 @@ class IncidentRepository {
 
     final remote = await api.getIncidents();
     final local = await getAllIncidents();
-    await _pullMissing(remote, local, pendingIds);
+
+    // Baca ulang pendingIds tepat sebelum _pullMissing agar insiden yang baru
+    // dihapus saat getIncidents() berjalan tidak ikut tertarik kembali (Fix #17).
+    final latestPendingIds = {
+      ...pendingIds,
+      ...pendingBox.keys.cast<String>(),
+    };
+
+    await _pullMissing(remote, local, latestPendingIds);
+
     final remoteIds = {for (final incident in remote) incident.id};
     for (final deletedId in pendingIds) {
       if (!remoteIds.contains(deletedId)) await pendingBox.delete(deletedId);
     }
+
     await _pushDifferences(api, remote, local);
     AppLogger.instance.info(
       'sync',

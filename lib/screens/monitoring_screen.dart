@@ -222,6 +222,10 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         debugPrint('Failed to stop monitoring sensors: $error');
       }));
     }
+    // Fix #14: hentikan foreground service meskipun pengguna keluar lewat tombol Back.
+    unawaited(_foregroundService.stopService().catchError((Object error) {
+      debugPrint('Failed to stop foreground service: $error');
+    }));
     super.dispose();
   }
 
